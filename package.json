@@ -7,10 +7,11 @@
     "predev": "node scripts/postbuild.mjs --favicon-only",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node scripts/postbuild.mjs",
-    "build:data": "npm run ingest:dol && npm test && npm run build",
+    "build:data": "npm run prepare:career && npm test && npm run build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test test/*.test.mjs",
     "refresh:bulletins": "node scripts/refresh-bulletins.mjs",
+    "prepare:career": "python3 scripts/prepare-career.py",
     "ingest:dol": "python3 scripts/ingest-dol.py --archive-dir .cache/dol"
   },
   "dependencies": {

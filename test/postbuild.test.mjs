@@ -59,6 +59,7 @@ test('initial salary HTML identifies full release scope without inventing absent
   assert.match(html, /391,764/);
   assert.match(html, /53,787/);
   assert.match(html, /\$5,000 through \$1,000,000/);
+  assert.match(html, /Both full-time and part-time filings are included/);
   assert.doesNotMatch(initialContent(route), /391,764|53,787|NaN/);
 });
 

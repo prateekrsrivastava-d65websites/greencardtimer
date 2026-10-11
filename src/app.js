@@ -30,7 +30,13 @@ const profileKey = p => `${p.country}:${p.category}:${p.priorityDate}:${p.chart}
 const countryLabel = id => bulletins.countries.find(c => c.id === id)?.label || id;
 const categoryLabel = id => bulletins.categories.find(c => c.id === id)?.label || id;
 const path = () => location.pathname === '/index.html' ? '/' : location.pathname.replace(/\/*$/, '/');
-function finishRender() { createIcons({ icons }); document.querySelectorAll('.nav a').forEach(a => { const active = a.getAttribute('href') === path(); a.classList.toggle('active', active); active ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'); }); }
+function finishRender() {
+  if (bulletins && bulletins.latestMonth < new Date().toISOString().slice(0, 7) && !document.querySelector('#freshness-notice')) {
+    main.insertAdjacentHTML('afterbegin', `<div id="freshness-notice" class="inline-notice" role="status" style="margin:0 0 22px">${icon('info')}<span>The latest verified bulletin here is ${esc(month(bulletins.latestMonth))}. A newer month has not been verified. ${sourceLink(bulletins.sourceUrl, 'Check the official bulletin')}.</span></div>`);
+  }
+  createIcons({ icons });
+  document.querySelectorAll('.nav a').forEach(a => { const active = a.getAttribute('href') === path(); a.classList.toggle('active', active); active ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'); });
+}
 function toast(text) { document.querySelector('.toast')?.remove(); clearTimeout(toastTimer); const element = document.createElement('div'); element.className = 'toast'; element.setAttribute('role', 'status'); element.textContent = text; document.body.append(element); toastTimer = setTimeout(() => element.remove(), 3500); }
 function heading(route, edition = '') { const [title, description] = headings[route]; document.title = `${title} | Green Card Timer`; return `<div class="page-heading"><div><h1>${title}</h1><p>${description}</p></div>${edition ? `<div class="edition"><span class="edition-dot"></span>${esc(edition)}</div>` : ''}</div>`; }
 function metric(label, value, detail = '', color = '') { return `<div class="metric"><div class="metric-label">${esc(label)}</div><div class="metric-value ${color}">${esc(value)}</div><div class="metric-sub">${esc(detail)}</div></div>`; }
