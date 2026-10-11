@@ -1,0 +1,1192 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-11",
+  "bulletinMonth": "2026-10",
+  "methodology": {
+    "kind": "historical-cutoff-scenarios",
+    "title": "Historical cutoff pace scenarios",
+    "description": "Each scenario asks when the selected cutoff could pass the priority date if it repeated a pace observed in the published Visa Bulletins. These are illustrations of past movement, not forecasts of visa supply, queue position, filing permission or individual approval.",
+    "parameters": {
+      "rollingWindowMonths": 6,
+      "minimumHistoryMonths": 12,
+      "minimumPositiveWindows": 3,
+      "maximumHorizonMonths": 120
+    },
+    "steps": [
+      "Use chronological, sourced monthly Final Action Date or Dates for Filing cutoffs for the selected country and category.",
+      "Measure net cutoff movement across every complete six-month window. Include stalls and retrogression. Exclude windows containing Current, Unavailable, missing dates or missing months.",
+      "Use the 25th, 50th and 75th percentiles of those observed net rates for slower, typical and faster pace illustrations. These overlapping windows are not independent probability samples.",
+      "Only show scenarios with at least twelve months of history, three positive complete windows, a dated latest cutoff, and positive overall net movement.",
+      "Advance by the number of whole bulletin months needed for the cutoff to pass, strictly, the entered date. A zero or negative pace has no finite date. Projections beyond ten years have no displayed date."
+    ],
+    "limitations": [
+      "Future movement depends on visa demand, supply, policy and agency decisions and can differ completely from prior movement. Scenarios are not probability bounds.",
+      "No USCIS inventory or I-140 queue is estimated. Approved petitions do not directly equal people or visa demand, and a filing cutoff hides applicants who cannot file.",
+      "This dataset does not independently verify USCIS's monthly choice of the filing chart. Check the official USCIS page before filing I-485.",
+      "Meeting a Final Action Date removes only the cutoff constraint. It does not establish approval, a reserved visa number, case readiness or a processing duration.",
+      "For consular processing, the filing cutoff concerns assembly and submission of documents following National Visa Center instructions."
+    ],
+    "sourceUrls": [
+      "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
+      "https://www.uscis.gov/visabulletininfo"
+    ]
+  },
+  "sourceAccess": {
+    "verifiedAt": "2026-10-11",
+    "bulletins": "Twenty-five official DOS bulletins from October 2024 through October 2026 were retrieved through the web research tool and normalized. Source URLs and dates are included for each bulletin.",
+    "inventory": "The current USCIS data index returned HTTP 403 during research. No current inventory was imported or inferred.",
+    "automation": "Local direct HTTP access to DOS returned HTTP 403. The refresh task validates all tables before writing and fails without changing existing data when sources block access or change shape. GitHub runner access still requires a successful real refresh."
+  },
+  "series": {
+    "India:EB1:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 11.991786447638603,
+      "averagePace": 0.49965776865160844,
+      "advancedMonths": 6,
+      "retrogressedMonths": 2,
+      "unchangedMonths": 16,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 13,
+      "pace": {
+        "slower": 0,
+        "typical": 0.07665982203969883,
+        "faster": 1.7138945927446954
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 3.5811088295687883
+      }
+    },
+    "India:EB1:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 26.546201232032853,
+      "averagePace": 1.106091718001369,
+      "advancedMonths": 4,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 20,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 12,
+      "pace": {
+        "slower": 0,
+        "typical": 1.1663244353182751,
+        "faster": 1.9986310746064337
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 6.997946611909651
+      }
+    },
+    "India:EB2:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 15.572895277207392,
+      "averagePace": 0.648870636550308,
+      "advancedMonths": 10,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 11,
+      "currentMonths": 0,
+      "unavailableMonths": 3,
+      "completeWindows": 15,
+      "positiveWindows": 15,
+      "pace": {
+        "slower": 0.4982888432580424,
+        "typical": 0.837782340862423,
+        "faster": 1.0677618069815196
+      },
+      "lastMovement": {
+        "type": "available",
+        "months": null
+      }
+    },
+    "India:EB2:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 24.4435318275154,
+      "averagePace": 1.0184804928131417,
+      "advancedMonths": 4,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 20,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 18,
+      "pace": {
+        "slower": 0.1697467488021903,
+        "typical": 1.6591375770020533,
+        "faster": 2.245037645448323
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "India:EB3:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 13.995893223819301,
+      "averagePace": 0.5831622176591376,
+      "advancedMonths": 13,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 11,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 19,
+      "pace": {
+        "slower": 0.46269678302532513,
+        "typical": 0.7775496235455167,
+        "faster": 0.8706365503080082
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "India:EB3:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 19.252566735112936,
+      "averagePace": 0.8021902806297057,
+      "advancedMonths": 2,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 22,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 12,
+      "pace": {
+        "slower": 0,
+        "typical": 0.837782340862423,
+        "faster": 2.3709787816563996
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "India:EB3OW:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 13.995893223819301,
+      "averagePace": 0.5831622176591376,
+      "advancedMonths": 13,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 11,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 19,
+      "pace": {
+        "slower": 0.46269678302532513,
+        "typical": 0.7775496235455167,
+        "faster": 0.8706365503080082
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "India:EB3OW:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 19.252566735112936,
+      "averagePace": 0.8021902806297057,
+      "advancedMonths": 2,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 22,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 12,
+      "pace": {
+        "slower": 0,
+        "typical": 0.837782340862423,
+        "faster": 2.3709787816563996
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "India:EB5:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 22.965092402464066,
+      "averagePace": 0.9568788501026694,
+      "advancedMonths": 4,
+      "retrogressedMonths": 2,
+      "unchangedMonths": 16,
+      "currentMonths": 0,
+      "unavailableMonths": 3,
+      "completeWindows": 15,
+      "positiveWindows": 9,
+      "pace": {
+        "slower": -4.298425735797399,
+        "typical": 2.4859685147159483,
+        "faster": 3.9260780287474333
+      },
+      "lastMovement": {
+        "type": "available",
+        "months": null
+      }
+    },
+    "India:EB5:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 25.00205338809035,
+      "averagePace": 1.0417522245037645,
+      "advancedMonths": 1,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 23,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 6,
+      "pace": {
+        "slower": 0,
+        "typical": 0,
+        "faster": 4.167008898015058
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "China:EB1:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 7.7207392197125255,
+      "averagePace": 0.3216974674880219,
+      "advancedMonths": 8,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 16,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 16,
+      "pace": {
+        "slower": 0.038329911019849415,
+        "typical": 0.41067761806981523,
+        "faster": 0.5475701574264202
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "China:EB1:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 17.971252566735114,
+      "averagePace": 0.7488021902806298,
+      "advancedMonths": 4,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 20,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 12,
+      "pace": {
+        "slower": 0,
+        "typical": 0.7337440109514032,
+        "faster": 1.0951403148528405
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 6.997946611909651
+      }
+    },
+    "China:EB2:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 18.33264887063655,
+      "averagePace": 0.7638603696098563,
+      "advancedMonths": 9,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 15,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 16,
+      "pace": {
+        "slower": 0.6707734428473648,
+        "typical": 0.9965776865160848,
+        "faster": 1.297741273100616
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 0.9856262833675564
+      }
+    },
+    "China:EB2:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 27.006160164271048,
+      "averagePace": 1.1252566735112937,
+      "advancedMonths": 5,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 19,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 16,
+      "pace": {
+        "slower": 0.1697467488021903,
+        "typical": 0.5037645448323066,
+        "faster": 1.9986310746064337
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 11.991786447638603
+      }
+    },
+    "China:EB3:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 21.256673511293634,
+      "averagePace": 0.8856947296372347,
+      "advancedMonths": 14,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 10,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 19,
+      "pace": {
+        "slower": 0.6680355920602327,
+        "typical": 0.8268309377138946,
+        "faster": 1.1718001368925395
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 0.2299794661190965
+      }
+    },
+    "China:EB3:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 40.50924024640657,
+      "averagePace": 1.6878850102669405,
+      "advancedMonths": 4,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 20,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 13,
+      "pace": {
+        "slower": 0,
+        "typical": 0.2026009582477755,
+        "faster": 2.053388090349076
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 26.743326488706366
+      }
+    },
+    "China:EB3OW:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 32.95277207392197,
+      "averagePace": 1.3730321697467487,
+      "advancedMonths": 9,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 15,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 19,
+      "pace": {
+        "slower": 0.6570841889117043,
+        "typical": 1.325119780971937,
+        "faster": 2.3381245722108144
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 5.026694045174538
+      }
+    },
+    "China:EB3OW:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 32.98562628336756,
+      "averagePace": 1.374401095140315,
+      "advancedMonths": 3,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 21,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 10,
+      "pace": {
+        "slower": 0,
+        "typical": 1.4948665297741275,
+        "faster": 1.9986310746064337
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 12.02464065708419
+      }
+    },
+    "China:EB5:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 4.566735112936345,
+      "averagePace": 0.19028062970568105,
+      "advancedMonths": 6,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 17,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 13,
+      "pace": {
+        "slower": -1.2046543463381245,
+        "typical": 0.5913757700205339,
+        "faster": 1.5249828884325805
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "China:EB5:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 52.96098562628337,
+      "averagePace": 2.206707734428474,
+      "advancedMonths": 5,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 18,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 7,
+      "pace": {
+        "slower": -0.10951403148528405,
+        "typical": 0,
+        "faster": 0.9363449691991785
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 48
+      }
+    },
+    "Mexico:EB1:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Mexico:EB1:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Mexico:EB2:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 21.61806981519507,
+      "averagePace": 0.9007529089664613,
+      "advancedMonths": 8,
+      "retrogressedMonths": 2,
+      "unchangedMonths": 13,
+      "currentMonths": 6,
+      "unavailableMonths": 0,
+      "completeWindows": 12,
+      "positiveWindows": 12,
+      "pace": {
+        "slower": 0.596851471594798,
+        "typical": 0.8870636550308008,
+        "faster": 1.1006160164271046
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "Mexico:EB2:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 31.44147843942505,
+      "averagePace": 1.3100616016427105,
+      "advancedMonths": 3,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 19,
+      "currentMonths": 7,
+      "unavailableMonths": 0,
+      "completeWindows": 11,
+      "positiveWindows": 9,
+      "pace": {
+        "slower": 0.5804243668720055,
+        "typical": 0.5804243668720055,
+        "faster": 1.834360027378508
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "Mexico:EB3:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 17.971252566735114,
+      "averagePace": 0.7488021902806298,
+      "advancedMonths": 11,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 12,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 18,
+      "pace": {
+        "slower": 0.34770704996577684,
+        "typical": 0.6625598904859685,
+        "faster": 2.0506502395619437
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": -3.5811088295687883
+      }
+    },
+    "Mexico:EB3:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 17.05133470225873,
+      "averagePace": 0.7104722792607804,
+      "advancedMonths": 4,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 18,
+      "currentMonths": 6,
+      "unavailableMonths": 0,
+      "completeWindows": 12,
+      "positiveWindows": 9,
+      "pace": {
+        "slower": 0.25051334702258726,
+        "typical": 0.33401779603011633,
+        "faster": 0.6680355920602327
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "Mexico:EB3OW:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 13.010266940451745,
+      "averagePace": 0.542094455852156,
+      "advancedMonths": 12,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 11,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 19,
+      "pace": {
+        "slower": 0.31759069130732376,
+        "typical": 0.8596851471594799,
+        "faster": 1.054072553045859
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": -2.9568788501026693
+      }
+    },
+    "Mexico:EB3OW:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 12.320328542094456,
+      "averagePace": 0.513347022587269,
+      "advancedMonths": 5,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 18,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 18,
+      "pace": {
+        "slower": 0.33401779603011633,
+        "typical": 0.7227926078028748,
+        "faster": 1.3305954825462012
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": -2.004106776180698
+      }
+    },
+    "Mexico:EB5:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Mexico:EB5:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Philippines:EB1:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Philippines:EB1:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Philippines:EB2:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 21.61806981519507,
+      "averagePace": 0.9007529089664613,
+      "advancedMonths": 8,
+      "retrogressedMonths": 2,
+      "unchangedMonths": 13,
+      "currentMonths": 6,
+      "unavailableMonths": 0,
+      "completeWindows": 12,
+      "positiveWindows": 12,
+      "pace": {
+        "slower": 0.596851471594798,
+        "typical": 0.8870636550308008,
+        "faster": 1.1006160164271046
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "Philippines:EB2:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 31.44147843942505,
+      "averagePace": 1.3100616016427105,
+      "advancedMonths": 3,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 19,
+      "currentMonths": 7,
+      "unavailableMonths": 0,
+      "completeWindows": 11,
+      "positiveWindows": 9,
+      "pace": {
+        "slower": 0.5804243668720055,
+        "typical": 0.5804243668720055,
+        "faster": 1.834360027378508
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "Philippines:EB3:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 8.969199178644764,
+      "averagePace": 0.37371663244353187,
+      "advancedMonths": 9,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 15,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 18,
+      "pace": {
+        "slower": 0.34770704996577684,
+        "typical": 0.3997262149212868,
+        "faster": 0.5722108145106092
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 0.459958932238193
+      }
+    },
+    "Philippines:EB3:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 10.053388090349076,
+      "averagePace": 0.4188911704312115,
+      "advancedMonths": 4,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 20,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 14,
+      "pace": {
+        "slower": 0.16700889801505817,
+        "typical": 0.5037645448323066,
+        "faster": 0.9226557152635181
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Philippines:EB3OW:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 13.010266940451745,
+      "averagePace": 0.542094455852156,
+      "advancedMonths": 11,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 13,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 19,
+      "pace": {
+        "slower": 0.30116358658453113,
+        "typical": 0.5037645448323066,
+        "faster": 0.9418206707734429
+      },
+      "lastMovement": {
+        "type": "advanced",
+        "months": 1.0184804928131417
+      }
+    },
+    "Philippines:EB3OW:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 12.320328542094456,
+      "averagePace": 0.513347022587269,
+      "advancedMonths": 5,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 18,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 18,
+      "pace": {
+        "slower": 0.33401779603011633,
+        "typical": 0.7227926078028748,
+        "faster": 1.3305954825462012
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": -2.004106776180698
+      }
+    },
+    "Philippines:EB5:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "Philippines:EB5:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "ROW:EB1:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "ROW:EB1:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "ROW:EB2:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 21.61806981519507,
+      "averagePace": 0.9007529089664613,
+      "advancedMonths": 8,
+      "retrogressedMonths": 2,
+      "unchangedMonths": 13,
+      "currentMonths": 6,
+      "unavailableMonths": 0,
+      "completeWindows": 12,
+      "positiveWindows": 12,
+      "pace": {
+        "slower": 0.596851471594798,
+        "typical": 0.8870636550308008,
+        "faster": 1.1006160164271046
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "ROW:EB2:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 31.44147843942505,
+      "averagePace": 1.3100616016427105,
+      "advancedMonths": 3,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 19,
+      "currentMonths": 7,
+      "unavailableMonths": 0,
+      "completeWindows": 11,
+      "positiveWindows": 9,
+      "pace": {
+        "slower": 0.5804243668720055,
+        "typical": 0.5804243668720055,
+        "faster": 1.834360027378508
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "ROW:EB3:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 17.971252566735114,
+      "averagePace": 0.7488021902806298,
+      "advancedMonths": 11,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 12,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 18,
+      "pace": {
+        "slower": 0.34770704996577684,
+        "typical": 0.6625598904859685,
+        "faster": 2.0506502395619437
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": -3.5811088295687883
+      }
+    },
+    "ROW:EB3:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 17.05133470225873,
+      "averagePace": 0.7104722792607804,
+      "advancedMonths": 4,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 18,
+      "currentMonths": 6,
+      "unavailableMonths": 0,
+      "completeWindows": 12,
+      "positiveWindows": 9,
+      "pace": {
+        "slower": 0.25051334702258726,
+        "typical": 0.33401779603011633,
+        "faster": 0.6680355920602327
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": null
+      }
+    },
+    "ROW:EB3OW:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 13.010266940451745,
+      "averagePace": 0.542094455852156,
+      "advancedMonths": 12,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 11,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 19,
+      "pace": {
+        "slower": 0.31759069130732376,
+        "typical": 0.8596851471594799,
+        "faster": 1.054072553045859
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": -2.9568788501026693
+      }
+    },
+    "ROW:EB3OW:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": 12.320328542094456,
+      "averagePace": 0.513347022587269,
+      "advancedMonths": 5,
+      "retrogressedMonths": 1,
+      "unchangedMonths": 18,
+      "currentMonths": 0,
+      "unavailableMonths": 0,
+      "completeWindows": 19,
+      "positiveWindows": 18,
+      "pace": {
+        "slower": 0.33401779603011633,
+        "typical": 0.7227926078028748,
+        "faster": 1.3305954825462012
+      },
+      "lastMovement": {
+        "type": "retrogressed",
+        "months": -2.004106776180698
+      }
+    },
+    "ROW:EB5:finalAction": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    },
+    "ROW:EB5:filing": {
+      "monthsObserved": 24,
+      "fromMonth": "2024-10",
+      "toMonth": "2026-10",
+      "netMovementMonths": null,
+      "averagePace": null,
+      "advancedMonths": 0,
+      "retrogressedMonths": 0,
+      "unchangedMonths": 24,
+      "currentMonths": 25,
+      "unavailableMonths": 0,
+      "completeWindows": 0,
+      "positiveWindows": 0,
+      "pace": {
+        "slower": null,
+        "typical": null,
+        "faster": null
+      },
+      "lastMovement": {
+        "type": "unchanged",
+        "months": 0
+      }
+    }
+  }
+}

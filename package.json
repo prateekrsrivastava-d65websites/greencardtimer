@@ -1,0 +1,23 @@
+{
+  "name": "green-card-timer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/postbuild.mjs --favicon-only",
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build && node scripts/postbuild.mjs",
+    "build:data": "npm run ingest:dol && npm test && npm run build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test test/*.test.mjs",
+    "refresh:bulletins": "node scripts/refresh-bulletins.mjs",
+    "ingest:dol": "python3 scripts/ingest-dol.py --archive-dir .cache/dol"
+  },
+  "dependencies": {
+    "lucide": "^0.468.0"
+  },
+  "devDependencies": {
+    "cheerio": "^1.0.0",
+    "vite": "^6.0.0"
+  }
+}

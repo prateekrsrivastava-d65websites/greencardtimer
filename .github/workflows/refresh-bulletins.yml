@@ -1,0 +1,41 @@
+name: Refresh Official Bulletins
+
+on:
+  schedule:
+    - cron: '37 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-bulletins
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run refresh:bulletins
+      - run: npm test
+      - run: npm run build
+      - name: Commit Only Changed, Validated Data
+        run: |
+          git add -- public/data/bulletins.json public/data/model.json
+          if git diff --cached --quiet; then
+            echo "Official tables unchanged; no commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "data: refresh official visa bulletins"
+          git push origin HEAD:main
