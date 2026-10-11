@@ -1,8 +1,6 @@
 name: Refresh Official Bulletins
 
 on:
-  schedule:
-    - cron: '37 12 * * *'
   workflow_dispatch:
 
 permissions:

@@ -204,6 +204,19 @@ document.addEventListener('keydown', event => {
 });
 document.addEventListener('click', event => { const menu = document.querySelector('#employer-options'); if (menu && !event.target.closest('.employer-search')) { menu.hidden = true; document.querySelector('#employer-search')?.setAttribute('aria-expanded', 'false'); } });
 window.addEventListener('popstate', renderRoute);
+let chartResizeFrame, previousWidth = window.innerWidth;
+window.addEventListener('resize', () => {
+  if (window.innerWidth === previousWidth) return;
+  previousWidth = window.innerWidth;
+  cancelAnimationFrame(chartResizeFrame);
+  chartResizeFrame = requestAnimationFrame(() => {
+    const previousChart = document.querySelector('.chart');
+    if (path() !== '/' || !previousChart || !bulletins) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = historyChart(evaluateProfile(profile, bulletins, model).trend.points);
+    previousChart.replaceWith(wrapper.firstElementChild);
+  });
+});
 async function boot() {
   finishRender();
   try {

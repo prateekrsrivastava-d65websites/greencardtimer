@@ -9,7 +9,7 @@
     "build": "vite build && node scripts/postbuild.mjs",
     "build:data": "npm run prepare:career && npm test && npm run build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs && python3 -m unittest discover -s test -p 'test_*.py'",
     "refresh:bulletins": "node scripts/refresh-bulletins.mjs",
     "prepare:career": "python3 scripts/prepare-career.py",
     "ingest:dol": "python3 scripts/ingest-dol.py --archive-dir .cache/dol"
