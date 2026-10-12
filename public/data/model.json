@@ -35,7 +35,7 @@
     "verifiedAt": "2026-10-11",
     "bulletins": "Twenty-five official DOS bulletins from October 2024 through October 2026 were retrieved through the web research tool and normalized. Source URLs and dates are included for each bulletin.",
     "inventory": "The current USCIS data index returned HTTP 403 during research. No current inventory was imported or inferred.",
-    "automation": "Local direct HTTP access to DOS returned HTTP 403. The refresh task validates all tables before writing and fails without changing existing data when sources block access or change shape. GitHub runner access still requires a successful real refresh."
+    "automation": "GitHub Actions checks weekly. Official DOS HTML is fetched from travel.state.gov or its openly published adoption.state.gov/adoptions.state.gov hosts. Canonical sources and actual retrieval URLs are retained. All tracked cells and contiguous history are validated; errors preserve the published data. A monthly successful-check record does not change the data verification date."
   },
   "series": {
     "India:EB1:finalAction": {

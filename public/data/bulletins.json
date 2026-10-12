@@ -4,7 +4,7 @@
   "latestMonth": "2026-10",
   "source": "U.S. Department of State Visa Bulletin",
   "sourceUrl": "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
-  "verificationMethod": "Official DOS bulletin tables retrieved and normalized on October 11, 2026.",
+  "verificationMethod": "Official DOS HTML tables identified by chart heading and parsed with Cheerio; all tracked cells and contiguous monthly history validated.",
   "chartSelectionNote": "USCIS chart choice has not been independently verified. Check its official monthly chart selection before filing I-485.",
   "countries": [
     {
@@ -134,7 +134,8 @@
             "Philippines": "C"
           }
         }
-      }
+      },
+      "retrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2027/visa-bulletin-for-october-2026.html"
     },
     {
       "month": "2026-09",
@@ -219,7 +220,8 @@
             "Philippines": "C"
           }
         }
-      }
+      },
+      "retrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-september-2026.html"
     },
     {
       "month": "2026-08",
@@ -2176,5 +2178,11 @@
         }
       }
     }
-  ]
+  ],
+  "refresh": {
+    "checkedAt": "2026-10-12",
+    "latestMonth": "2026-10",
+    "indexRetrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
+    "latestRetrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2027/visa-bulletin-for-october-2026.html"
+  }
 }
