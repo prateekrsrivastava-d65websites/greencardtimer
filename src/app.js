@@ -5,6 +5,7 @@ import { loadCareerIndex, loadCareerRows, autocompleteEmployers, searchSponsors,
 import { compareProcessingMonth, formatProcessingMonth, processingFreshness } from './processing.js';
 import { createCommunityRecorder } from './community-client.js';
 import { validCommunitySummary } from './community.js';
+import { communityDonut } from './community-chart.js';
 
 const icons = { Hourglass, Clock3, CalendarDays, BriefcaseBusiness, BookOpen, Unlock, ArrowUpRight, ArrowRight, ArrowLeft, Bookmark, Trash2, ShieldCheck, CircleCheck, CircleAlert, Share2, Printer, TrendingUp, Search, Download, ChevronLeft, ChevronRight, LockKeyhole, Info, Globe, RefreshCw, UsersRound };
 const main = document.querySelector('#main');
@@ -254,7 +255,7 @@ function homeCommunity() {
   return `<section id="community-trends" class="content-band home-community" aria-labelledby="community-trends-heading"><div class="section-heading"><div><h2 id="community-trends-heading">Community Search Trends</h2><p>Recorded searches / last 30 UTC days, including today</p></div><a class="method-link" href="/community/">About these counts ${icon('arrow-up-right')}</a></div>${communityContainer()}<p class="chart-caption">Includes repeat searches. These are search counts, not unique people or government queue data. <a href="/privacy/">Data practices</a>.</p></section>${adSpace('home-after-community')}`;
 }
 function communitySummary(data) {
-  return `<div class="community-summary"><strong>${number(data.total)}</strong><span>recorded ${data.total === 1 ? 'search' : 'searches'}</span><small>${formatDate(data.window.from)} to ${formatDate(data.window.through)} / UTC</small></div>${data.total ? `<div class="community-charts">${[['Country of chargeability',data.countries],['Visa preference category',data.categories],['Priority-date range',data.priorityPeriods]].map(([title,rows]) => `<section><h3>${title}</h3>${histogram(rows)}</section>`).join('')}</div>` : '<div class="community-empty"><h3>No recorded searches in this period</h3></div>'}`;
+  return `<div class="community-summary"><strong>${number(data.total)}</strong><span>recorded ${data.total === 1 ? 'search' : 'searches'}</span><small>${formatDate(data.window.from)} to ${formatDate(data.window.through)} / UTC</small></div>${data.total ? `<div class="community-charts">${[['Country of chargeability','countries'],['Visa preference category','categories'],['Priority-date range','priorityPeriods']].map(([title,dimension]) => `<section aria-labelledby="community-${dimension}-title"><h3 id="community-${dimension}-title">${title}</h3>${communityDonut(data[dimension], { title, total: data.total, dimension })}</section>`).join('')}</div>` : '<div class="community-empty"><h3>No recorded searches in this period</h3></div>'}`;
 }
 function rememberCommunitySummary(data) {
   if (!validCommunitySummary(data)) return false;
