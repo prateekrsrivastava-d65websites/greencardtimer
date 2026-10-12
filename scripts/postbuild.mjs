@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load } from 'cheerio';
 import { Hourglass } from 'lucide';
-import { formatDate } from '../src/model.js';
+import { formatDate, parseDate } from '../src/model.js';
 import { formatProcessingMonth } from '../src/processing.js';
 import { buildEmployerProfile, decodeCareerIndex, employerProfilePath, employerSalaryPath, selectStaticEmployers } from '../src/career.js';
 import { ROUTES, employerRoute, routeMetadata, structuredData, serializeStructuredData } from '../src/seo.js';
@@ -66,6 +66,38 @@ function count(value) {
   return Number(value).toLocaleString('en-US');
 }
 
+function coverageScope(careerData) {
+  const scope = careerData?.scope;
+  return typeof scope?.label === 'string' && scope.label.trim()
+    && Number.isSafeInteger(scope.records) && scope.records > 0
+    && Number.isSafeInteger(scope.employers) && scope.employers > 0 && scope.employers <= scope.records
+    ? scope : null;
+}
+
+export function governmentCoverage({ bulletinData, careerData } = {}) {
+  const scope = coverageScope(careerData);
+  if (!scope) return '';
+  const verifiedMonths = new Set((Array.isArray(bulletinData?.bulletins) ? bulletinData.bulletins : [])
+    .filter(bulletin => /^\d{4}-(?:0[1-9]|1[0-2])$/.test(bulletin?.month) && parseDate(bulletin.verifiedAt))
+    .map(bulletin => bulletin.month));
+  const metric = (label, value, url) => `<div><dt>${xml(label)}</dt><dd><a href="${url}">${count(value)}</a></dd></div>`;
+  return `<section id="government-coverage" class="government-coverage" aria-label="Official public data coverage"><p class="coverage-release">Official public data / ${xml(scope.label.trim().replaceAll('_', ' '))}</p><dl class="coverage-metrics">${metric('Disclosed employers', scope.employers, '/employers/')}${metric('Certified H-1B LCA records', scope.records, '/salary-data/')}${verifiedMonths.size ? metric('Verified visa bulletins', verifiedMonths.size, '/visa-bulletin/') : ''}</dl><p class="coverage-note">DOL certified H-1B LCA records, not site visitor counts, unique workers or open jobs. ${sourceLink('https://www.dol.gov/agencies/eta/foreign-labor/performance', 'Official DOL disclosure data')}.</p></section>`;
+}
+
+export function featuredEmployers(careerData) {
+  const scope = coverageScope(careerData);
+  if (!scope) return '';
+  let employers;
+  try {
+    const decoded = decodeCareerIndex(careerData);
+    if (!Array.isArray(decoded.employers)) return '';
+    employers = selectStaticEmployers({ employers: decoded.employers.filter(employer =>
+      typeof employer?.name === 'string' && employer.name.trim() && Number.isSafeInteger(employer.filings) && employer.filings > 0) }, 5);
+  } catch { return ''; }
+  if (!employers.length) return '';
+  return `<section id="employer-discovery" class="employer-discovery" aria-labelledby="employer-discovery-heading"><div class="section-heading"><div><h2 id="employer-discovery-heading">H-1B employer filing profiles</h2><p>${xml(scope.label.trim().replaceAll('_', ' '))} / highest certified filing counts</p></div></div><ul class="employer-discovery-links">${employers.map(employer => `<li><a href="${xml(employerProfilePath(employer))}"><span>${xml(employer.name)}</span><small>${count(employer.filings)} certified filings</small></a></li>`).join('')}</ul><p class="chart-caption">Public DOL filing records, not current job openings or green-card sponsorship guarantees. <a href="/employers/">All H-1B employer filing profiles</a>.</p></section>`;
+}
+
 function profileTable(label, headings, rows) {
   return `<h2>${xml(label)}</h2><div class="table-wrap"><table aria-label="${xml(label)}"><thead><tr>${headings.map(heading => `<th scope="col">${xml(heading)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map((value, i) => i === 0 ? `<th scope="row">${xml(value)}</th>` : `<td>${xml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
@@ -90,7 +122,7 @@ function employerContent(profile) {
   return body;
 }
 
-export function initialContent(route, { bulletinData, careerData, employerProfile, processingData } = {}) {
+export function initialContent(route, { bulletinData, careerData, employerProfile, processingData, publishedMarkup } = {}) {
   const latest = bulletinData?.bulletins.find(bulletin => bulletin.month === bulletinData.latestMonth);
   const dos = latest?.sourceUrl || 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html';
   const uscis = 'https://www.uscis.gov/visabulletininfo';
@@ -160,7 +192,10 @@ export function initialContent(route, { bulletinData, careerData, employerProfil
     body += '<p><a href="/salary-data/">H-1B salary disclosures</a> | <a href="/employers/">Employer filing profiles</a> | <a href="/methodology/">Sources and limitations</a></p>';
     body += '<section id="community-trends" aria-labelledby="community-trends-heading"><h2 id="community-trends-heading">Community Search Trends</h2><p>Country groups, visa preferences and priority-date ranges from submitted checks. Live charts load when JavaScript is available; no live counts are embedded in this page.</p><p>Valid priority-date checks are counted automatically, including repeat submissions. Charts cover the last 30 UTC calendar days, including today, and show exact counts from the first search. These are search counts, not unique people or government queue data.</p><p><a href="/community/">Community trends</a> | <a href="/privacy/">Data practices</a></p></section>';
   }
-  return `<div class="page-heading"><div><h1>${xml(title)}</h1></div></div><article class="reading">${body}</article>${searchContext(route.path)}`;
+  const home = route.path === '/';
+  const coverage = home ? publishedMarkup?.coverage ?? governmentCoverage({ bulletinData, careerData }) : '';
+  const discovery = home ? publishedMarkup?.employers ?? featuredEmployers(careerData) : '';
+  return `<div class="page-heading"><div><h1>${xml(title)}</h1></div></div>${coverage}<article class="reading">${body}</article>${discovery}${searchContext(route.path)}`;
 }
 
 export function routeHTML(html, route, origin = null, data = {}) {
@@ -188,7 +223,10 @@ export function routeHTML(html, route, origin = null, data = {}) {
   $('#page-schema').remove();
   const graph = structuredData(route, origin, data);
   if (graph) $('head').append(`<script id="page-schema" type="application/ld+json">${serializeStructuredData(graph)}</script>`);
-  $('#main').attr('data-published-route', route.path).html(initialContent(route, data));
+  const publishedMarkup = data.publishedMarkup ?? { coverage: governmentCoverage(data), employers: featuredEmployers(data.careerData) };
+  $('#main').attr('data-published-route', route.path).html(initialContent(route, { ...data, publishedMarkup }));
+  $('#published-government-coverage, #published-employer-discovery').remove();
+  $('body').append(`<template id="published-government-coverage">${publishedMarkup.coverage}</template><template id="published-employer-discovery">${publishedMarkup.employers}</template>`);
   $('.nav a').each((_, element) => {
     const active = $(element).attr('href') === route.path;
     $(element).toggleClass('active', active);
@@ -218,10 +256,13 @@ export async function postbuild({ root = ROOT, siteURL = process.env.SITE_URL, f
   let processingData;
   try { processingData = JSON.parse(await readFile(resolve(dist,'data/processing.json'),'utf8')); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const data = { bulletinData, careerData, processingData,
+    publishedMarkup: { coverage: governmentCoverage({ bulletinData, careerData }), employers: featuredEmployers(careerData) },
+  };
   for (const route of ROUTES) {
     const directory = resolve(dist, `.${route.path}`);
     await mkdir(directory, { recursive: true });
-    await writeFile(resolve(directory, 'index.html'), routeHTML(html, route, origin, { bulletinData, careerData, processingData }));
+    await writeFile(resolve(directory, 'index.html'), routeHTML(html, route, origin, data));
   }
   const employerRoutes = [];
   if (careerData) {
@@ -246,7 +287,7 @@ export async function postbuild({ root = ROOT, siteURL = process.env.SITE_URL, f
         const route = employerRoute(employerProfile);
         const directory = resolve(dist, `.${route.path}`);
         await mkdir(directory, { recursive: true });
-        await writeFile(resolve(directory, 'index.html'), routeHTML(html, route, origin, { employerProfile }));
+        await writeFile(resolve(directory, 'index.html'), routeHTML(html, route, origin, { ...data, employerProfile }));
         employerRoutes.push(route);
       }
     }

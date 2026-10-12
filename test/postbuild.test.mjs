@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { load } from 'cheerio';
-import { assetCacheRules, employerRoute, faviconMarkup, initialContent, postbuild, ROUTES, routeHTML, siteOrigin } from '../scripts/postbuild.mjs';
+import { assetCacheRules, employerRoute, faviconMarkup, featuredEmployers, governmentCoverage, initialContent, postbuild, ROUTES, routeHTML, siteOrigin } from '../scripts/postbuild.mjs';
 import { samePublishedBulletin } from '../scripts/refresh-bulletins.mjs';
 import { formatDate } from '../src/model.js';
 import { buildEmployerProfile, employerProfilePath, employerSalaryPath } from '../src/career.js';
@@ -84,6 +84,88 @@ const careerFixture = {
   employers: [employer], scope: { label: 'FY2026_Q3', records: 2, employers: 1 },
   sources: [{ url: 'https://www.dol.gov/official-disclosure.xlsx' }], generatedAt: '2026-10-11T00:00:00Z', shardPrefixLength: 2,
 };
+
+test('government coverage uses current source counts and only distinct verified bulletin months', () => {
+  const careerData = { scope: { label: 'FY2027_Q1', records: 122876, employers: 30041 } };
+  const data = { bulletins: [
+    { month: '2027-01', verifiedAt: '2027-01-02' },
+    { month: '2027-01', verifiedAt: '2027-01-03' },
+    { month: '2026-12', verifiedAt: '2026-12-04' },
+    { month: '2026-11' },
+    { month: '2026-13', verifiedAt: '2026-12-04' },
+    { month: '2026-10', verifiedAt: '2026-02-30' },
+  ] };
+  const $ = load(governmentCoverage({ bulletinData: data, careerData }));
+  assert.equal($('#government-coverage').attr('aria-label'), 'Official public data coverage');
+  assert.deepEqual($('.coverage-metrics dd').map((_, element) => $(element).text()).get(), ['30,041', '122,876', '2']);
+  assert.deepEqual($('.coverage-metrics a').map((_, element) => $(element).attr('href')).get(), ['/employers/', '/salary-data/', '/visa-bulletin/']);
+  assert.match($('.coverage-release').text(), /FY2027 Q1/);
+  assert.match($('.coverage-note').text(), /DOL certified H-1B LCA records, not site visitor counts/);
+  assert.equal($('.coverage-note a').attr('href'), 'https://www.dol.gov/agencies/eta/foreign-labor/performance');
+  assert.doesNotMatch($.text(), /391,764|53,787/);
+  const noBulletins = load(governmentCoverage({ careerData }));
+  assert.equal(noBulletins('.coverage-metrics dd').length, 2);
+  const escaped = load(governmentCoverage({ careerData: { scope: { ...careerData.scope, label: 'FY2027_Q1 </template><script>bad</script>' } } }));
+  assert.match(escaped('.coverage-release').text(), /FY2027 Q1 <\/template><script>bad<\/script>/);
+  assert.equal(escaped('script, template').length, 0);
+});
+
+test('government coverage and employer discovery omit missing or unusable data without invented fallback counts', () => {
+  for (const scope of [null, {}, { label: '', records: 10, employers: 1 }, { label: 'FY2027_Q1', records: NaN, employers: 1 },
+    { label: 'FY2027_Q1', records: 10, employers: 0 }, { label: 'FY2027_Q1', records: 1, employers: 2 },
+    { label: 'FY2027_Q1', records: '10000', employers: 1000 }]) {
+    assert.equal(governmentCoverage({ careerData: { scope } }), '');
+    assert.equal(featuredEmployers({ scope, employers: [employer] }), '');
+  }
+  assert.equal(governmentCoverage(), '');
+  assert.equal(featuredEmployers(), '');
+  for (const data of [{ ...careerFixture, employers: [] }, { scope: careerFixture.scope },
+    { ...careerFixture, employers: [null, { id: 'bad', name: 'Invalid profile', filings: 1 }, { ...employer, filings: Infinity }] }]) {
+    assert.equal(featuredEmployers(data), '');
+  }
+});
+
+test('employer discovery links the five highest certified filing profiles with escaped source names', () => {
+  const employers = [2, 9, 4, 7, 1, 5, 3].map((filings, index) => ({
+    id: `${index + 1}`.padStart(16, '0'), name: `Employer ${index}`, filings,
+  }));
+  employers[1].name = 'LARGE & SONS </template><img src=x onerror=bad()>';
+  const data = { scope: { label: 'FY2027_Q1 </template><script>bad</script>', records: 50, employers: 7 }, employers };
+  const $ = load(featuredEmployers(data));
+  const expected = [...employers].sort((a, b) => b.filings - a.filings).slice(0, 5);
+  assert.equal($('#employer-discovery-heading').text(), 'H-1B employer filing profiles');
+  assert.deepEqual($('.employer-discovery-links a').map((_, element) => $(element).attr('href')).get(), expected.map(employerProfilePath));
+  assert.deepEqual($('.employer-discovery-links span').map((_, element) => $(element).text()).get(), expected.map(item => item.name));
+  assert.deepEqual($('.employer-discovery-links small').map((_, element) => $(element).text()).get(), expected.map(item => `${item.filings} certified filings`));
+  assert.match($.text(), /FY2027 Q1 <\/template><script>bad<\/script>/);
+  assert.equal($('img, script, template').length, 0);
+  assert.equal($('.chart-caption a').attr('href'), '/employers/');
+  const encoded = { ...data, employers: undefined, employerColumns: ['id', 'name', 'filings'], employerRows: employers.map(item => [item.id, item.name, item.filings]) };
+  assert.equal(featuredEmployers(encoded), featuredEmployers(data));
+});
+
+test('root publishes coverage and profile discovery while every route retains matching inert templates', () => {
+  const data = { bulletinData, careerData: careerFixture };
+  const html = '<html><head></head><body><main id="main"></main><template id="published-government-coverage">stale</template><template id="published-employer-discovery">stale</template></body></html>';
+  for (const path of ['/', '/salary-data/', '/employers/']) {
+    const $ = load(routeHTML(html, ROUTES.find(route => route.path === path), 'https://timer.example', data));
+    assert.equal($('#published-government-coverage').length, 1);
+    assert.equal($('#published-employer-discovery').length, 1);
+    assert.equal($('#main template').length, 0);
+    const coverage = load($('#published-government-coverage').html());
+    const discovery = load($('#published-employer-discovery').html());
+    assert.equal(coverage('#government-coverage').prop('outerHTML'), load(governmentCoverage(data))('#government-coverage').prop('outerHTML'));
+    assert.equal(discovery('#employer-discovery').prop('outerHTML'), load(featuredEmployers(careerFixture))('#employer-discovery').prop('outerHTML'));
+    assert.equal($('#main #government-coverage').length, path === '/' ? 1 : 0);
+    assert.equal($('#main #employer-discovery').length, path === '/' ? 1 : 0);
+    if (path === '/') {
+      assert.equal($('#main #government-coverage').prop('outerHTML'), coverage('#government-coverage').prop('outerHTML'));
+      assert.equal($('#main #employer-discovery').prop('outerHTML'), discovery('#employer-discovery').prop('outerHTML'));
+      assert.equal($('#government-coverage').prev().attr('class'), 'page-heading');
+      assert.equal($('#main #employer-discovery').prev().prop('tagName'), 'ARTICLE');
+    }
+  }
+});
 
 test('route metadata uses configured real origin only', () => {
   const html = '<!doctype html><html><head><title>Old</title><meta name="description" content="Old"><link rel="canonical" href="https://old.example/"></head><body><script type="module" src="/assets/app-abc12345.js"></script></body></html>';
@@ -267,6 +349,9 @@ test('postbuild generates selected employer profiles and includes the actual rou
     assert.equal(profile('tbody').length, 5);
     assert.equal(profile('link[rel="canonical"]').attr('href'), `https://timer.example${path}`);
     assert.equal(profile(`a[href="${employerSalaryPath(employer.id)}"]`).length, 1);
+    assert.equal(load(profile('#published-government-coverage').html())('.coverage-metrics dd').first().text(), '1');
+    assert.equal(load(profile('#published-employer-discovery').html())('.employer-discovery-links a').attr('href'), path);
+    assert.equal(profile('#main #government-coverage, #main #employer-discovery').length, 0);
     const directory = load(await readFile(join(root, 'dist/employers/index.html'), 'utf8'));
     assert.equal(directory('tbody a').attr('href'), path);
     const broken = { columns, employers: { [employer.id]: { name: employer.name, rows: [] } } };

@@ -9,8 +9,8 @@ import { bulletinData, modelData } from './fixtures/model-bulletins.mjs';
 
 const savedProfile = { country: 'India', category: 'EB2', priorityDate: '2017-04-21', chart: 'finalAction', filingPath: 'aos' };
 
-async function browserHarness({ route = '/', search = '', saved = [], failData = false } = {}) {
-  let $ = load('<main id="main" data-published-route="/"><table><tr><td>Published cutoffs</td></tr></table></main>'), version = 0, total = 10;
+async function browserHarness({ route = '/', search = '', saved = [], failData = false, homePanels = '' } = {}) {
+  let $ = load(`<main id="main" data-published-route="/"><table><tr><td>Published cutoffs</td></tr></table></main>${homePanels}`), version = 0, total = 10;
   const requests = [], listeners = {}, observers = [], storage = new Map([['gct.profiles', JSON.stringify(saved)]]);
   const location = { pathname: route, search, origin: 'https://example.test' };
   const summary = () => ({
@@ -120,6 +120,25 @@ test('priority-date workspace switches community and results without changing re
     assert.equal(harness.observers.length, 0);
     assert.equal($('#category option').toArray().every(node => $(node).val().startsWith('F')), route !== '/');
   }
+
+  const coverage = '<section id="government-coverage"><h2>Official public data coverage</h2><p>5 disclosed employers, 30 certified H-1B LCA cases</p></section>';
+  const discovery = '<section id="employer-discovery"><h2>H-1B employer filing profiles</h2><a href="/employers/example--abcdef0123456789/">Example H-1B filing profile</a></section>';
+  const homePanels = `<template id="published-government-coverage">${coverage}</template><template id="published-employer-discovery">${discovery}</template>`;
+  const published = await browserHarness({ route: '/family-green-card/', homePanels });
+  assert.equal(published.html()('#government-coverage, #employer-discovery').length, 0);
+  published.location.pathname = '/';
+  published.app.renderRoute();
+  await published.settle();
+  assert.equal(published.html()('#government-coverage').toString(), coverage);
+  assert.equal(published.html()('#employer-discovery').toString(), discovery);
+  assert.equal(published.html()('.workspace > #community-trends').length, 1);
+  published.document.querySelector('#priority-date').value = '04-21-2017';
+  await published.trigger('submit', '#profile-form');
+  assert.equal(published.html()('#government-coverage').toString(), coverage);
+  assert.equal(published.html()('#employer-discovery').toString(), discovery);
+  assert.equal(published.html()('.workspace > .results').length, 1);
+  assert.equal(published.requests.filter(request => request.url.startsWith('/data/')).length, 2);
+  assert.equal(published.requests.filter(request => request.options?.method === 'POST').length, 1);
 
   const invalid = await browserHarness();
   invalid.document.querySelector('#priority-date').value = '02-29-2025';
