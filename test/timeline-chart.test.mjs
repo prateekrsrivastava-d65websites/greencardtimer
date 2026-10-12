@@ -7,10 +7,10 @@ import * as vm from 'node:vm';
 import { load } from 'cheerio';
 import { bulletinData, modelData } from './fixtures/model-bulletins.mjs';
 
-async function browserHarness() {
+async function browserHarness({ failCareerRows = false } = {}) {
   const observers = [], draws = [], location = { pathname: '/', origin: 'https://example.test', search: '' };
   const chart = { getBoundingClientRect: () => ({ width: 400 }), replaceChildren: svg => draws.push(svg) };
-  const main = { querySelector: selector => selector === '.chart' ? chart : null, insertAdjacentHTML() {} };
+  const main = { attributes: {}, getAttribute(name) { return this.attributes[name]; }, removeAttribute(name) { delete this.attributes[name]; }, querySelector: selector => selector === '.chart' ? chart : null, insertAdjacentHTML() {} };
   const document = {
     querySelector: selector => selector === '#main' ? main : null, querySelectorAll: () => [], addEventListener() {},
     createElement: () => ({ innerHTML: '', querySelector(selector) { return load(this.innerHTML)(selector).toString(); } }),
@@ -27,18 +27,21 @@ async function browserHarness() {
   const url = new URL('../src/app.js', import.meta.url);
   const source = await readFile(url, 'utf8');
   // Export the existing functions for the harness without changing production module exports.
-  const app = new vm.SourceTextModule(`${source}\nexport { historyChart, observeHistoryChart, stopHistoryChartObserver, renderTimeline, renderRoute };
-    export function configureTest(data, config, range) { bulletins = data; model = config; chartWindow = range; }`, { context });
+  const app = new vm.SourceTextModule(`${source}\nexport { historyChart, observeHistoryChart, stopHistoryChartObserver, renderTimeline, renderRoute, renderBulletin, renderEmployerProfile };
+    export function configureTest(data, config, range) { bulletins = data; model = config; chartWindow = range; }
+    export function configureTestMonth(value) { bulletinMonth = value; }
+    export function configureTestCareer(value) { careerIndex = value; }
+    export function testMetadata() { return pageMetadata; }`, { context });
   await app.link(async specifier => {
     const values = specifier.endsWith('.css') ? {} : await import(specifier === 'lucide' ? specifier : new URL(specifier, url).href);
-    const exports = specifier === 'lucide' ? { ...values, createIcons() {} } : values;
+    const exports = specifier === 'lucide' ? { ...values, createIcons() {} } : specifier === './career.js' && failCareerRows ? { ...values, async loadCareerRows() { throw new Error('Temporary network failure'); } } : values;
     return new vm.SyntheticModule(Object.keys(exports), function () {
       for (const [name, value] of Object.entries(exports)) this.setExport(name, value);
     }, { context });
   });
   await app.evaluate();
   app.namespace.configureTest(bulletinData, modelData, 24);
-  return { app: app.namespace, observers, draws, chart, location };
+  return { app: app.namespace, observers, draws, chart, location, main, document };
 }
 
 test('cutoff charts use allocated width, avoid narrow tick collisions and clean up resize observers', async () => {
@@ -81,4 +84,41 @@ test('cutoff charts use allocated width, avoid narrow tick collisions and clean 
   app.renderRoute();
   assert.equal(replacement.disconnected, true);
   app.stopHistoryChartObserver();
+});
+
+test('app metadata and headings handle historical selections and genuinely missing employer routes', { skip: !vm.SourceTextModule }, async () => {
+  const { app, location, main, document } = await browserHarness();
+  const historical = bulletinData.bulletins.at(-1);
+  location.pathname = '/visa-bulletin/';
+  app.configureTestMonth(historical.month);
+  app.renderBulletin();
+  assert.equal(load(main.innerHTML)('h1').text(), `${historical.label} visa bulletin`);
+  assert.equal(document.title, `${bulletinData.bulletins.find(b => b.month === bulletinData.latestMonth).label} Visa Bulletin | Green Card Timer`);
+  app.configureTestCareer({ employers: [] });
+  location.pathname = '/employers/missing--0000000000000000/';
+  await app.renderEmployerProfile();
+  assert.equal(document.title, 'Employer Profile Unavailable | Green Card Timer');
+  assert.equal(app.testMetadata().noindex, true);
+  location.pathname = '/not-a-page/';
+  app.renderRoute();
+  assert.equal(document.title, 'Page Not Found | Green Card Timer');
+  assert.equal(app.testMetadata().noindex, true);
+  location.pathname = '/';
+  app.renderRoute();
+  assert.equal(app.testMetadata().noindex, undefined);
+  assert.match(document.title, /Green Card Wait Time/);
+  const preserved = await browserHarness({ failCareerRows: true });
+  preserved.location.pathname = '/employers/example--abcdef0123456789/';
+  preserved.main.attributes['data-published-route'] = preserved.location.pathname;
+  preserved.main.innerHTML = '<table><tr><td>Published wages</td></tr></table>';
+  preserved.document.title = 'Example H-1B Filings & Salaries | Green Card Timer';
+  preserved.app.configureTestCareer({ employers: [{ id: 'abcdef0123456789' }] });
+  await preserved.app.renderEmployerProfile();
+  assert.match(preserved.main.innerHTML, /Published wages/);
+  assert.equal(preserved.document.title, 'Example H-1B Filings & Salaries | Green Card Timer');
+  assert.equal(preserved.app.testMetadata(), null);
+  preserved.location.pathname = '/not-a-page/';
+  preserved.app.renderRoute();
+  assert.equal(preserved.main.getAttribute('data-published-route'), undefined);
+  assert.match(preserved.main.innerHTML, /Page not found/);
 });

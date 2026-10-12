@@ -92,7 +92,7 @@ test('route metadata uses configured real origin only', () => {
   assert.equal($('title').text(), route.title);
   assert.equal($('meta[name="description"]').length, 1);
   assert.equal($('link[rel="canonical"]').attr('href'), 'https://timer.example/visa-bulletin/');
-  assert.equal($('script').attr('src'), '/assets/app-abc12345.js');
+  assert.equal($('script[type="module"]').attr('src'), '/assets/app-abc12345.js');
   const withoutOrigin = load(routeHTML(html, route));
   assert.equal(withoutOrigin('link[rel="canonical"], meta[property="og:url"]').length, 0);
 });
@@ -142,7 +142,7 @@ test('family route publishes the current fifty-cell tables and category definiti
   assert.equal($('title').text(), 'Family-Based Green Card Tracker | Green Card Timer');
   assert.equal($('h1').text(), 'Family-Based Green Card Tracker');
   assert.equal($('link[rel="canonical"]').attr('href'), 'https://timer.example/family-green-card/');
-  assert.equal($('script').length, 0);
+  assert.equal($('script:not([type="application/ld+json"])').length, 0);
   assert.equal($('table').length, 2);
   assert.equal($('tbody tr').length, 10);
   assert.equal($('tbody td').length, 50);
@@ -219,8 +219,9 @@ test('initial employer HTML contains sourced case and wage tables without JavaSc
   const $ = load(routeHTML('<html><head><title>Old</title></head><body><main id="main"></main></body></html>', route, 'https://timer.example', { employerProfile }));
   assert.equal($('h1').text(), `${employer.name} H-1B Filing Profile`);
   assert.equal($('link[rel="canonical"]').attr('href'), `https://timer.example${employerProfile.path}`);
+  assert.equal($('#main').attr('data-published-route'), employerProfile.path);
   assert.equal($('title').text(), `${employer.name} H-1B Filings & Salaries | Green Card Timer`);
-  assert.equal($('script, img').length, 0);
+  assert.equal($('script:not([type="application/ld+json"]), img').length, 0);
   assert.equal($('table').length, 5);
   assert.match($.text(), /\$150,000/);
   assert.match($.text(), /1 full-time and 1 part-time filings/);

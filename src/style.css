@@ -18,5 +18,9 @@
 @media(prefers-reduced-motion:no-preference){.community-donut-segment{transition:stroke-width .12s,filter .12s}}
 .community-donut-total-long{font-size:26px}
 .input-wrap input:not([type=range]):not([type=checkbox]){padding-left:37px}
+.search-context{margin-top:32px;padding-top:24px;border-top:1px solid var(--line)}
+.search-context .details{margin:12px 0}
+.search-context .details p{margin:12px 0 0}
+.related-data{display:flex;flex-wrap:wrap;gap:12px 24px;margin-top:20px;font-size:13px}
 @media(max-width:420px){.profile-form{grid-template-columns:1fr}}
 @media(max-width:370px){.stat-row .metric-value{font-size:21px}}

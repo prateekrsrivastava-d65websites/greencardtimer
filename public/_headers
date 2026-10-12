@@ -7,3 +7,4 @@
 
 /data/*
   Cache-Control: public, max-age=300, must-revalidate
+  X-Robots-Tag: noindex

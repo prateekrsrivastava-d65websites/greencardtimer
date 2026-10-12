@@ -6,6 +6,8 @@ import { compareProcessingMonth, formatProcessingMonth, processingFreshness } fr
 import { createCommunityRecorder } from './community-client.js';
 import { validCommunitySummary } from './community.js';
 import { communityDonut } from './community-chart.js';
+import { routeMetadata, applyPageMetadata } from './seo.js';
+import { searchContext } from './search-context.js';
 
 const icons = { Hourglass, Clock3, CalendarDays, BriefcaseBusiness, BookOpen, Unlock, ArrowUpRight, ArrowRight, ArrowLeft, Bookmark, Trash2, ShieldCheck, CircleCheck, CircleAlert, Share2, Printer, TrendingUp, Search, Download, ChevronLeft, ChevronRight, LockKeyhole, Info, Globe, RefreshCw, UsersRound };
 const main = document.querySelector('#main');
@@ -19,11 +21,11 @@ const option = (value, label, selected) => `<option value="${esc(value)}" ${valu
 const sourceLink = (url, label) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)} ${icon('arrow-up-right')}</a>`;
 const adSpace = name => `<aside class="future-ad-slot" data-ad-slot="${name}" aria-hidden="true"></aside>`;
 const headings = {
-  '/': ['Priority date timeline', 'Your priority date, the latest cutoff, and the movement behind it.'],
+  '/': ['Green card wait time tracker', 'Your priority date, the latest verified cutoff, and the movement behind it.'],
   '/family-green-card/': ['Family green card tracker', 'Family preference cutoffs, your priority date, and actual monthly movement.'],
   '/visa-bulletin/': ['Visa bulletin', 'Employment and family preference cutoffs and month-to-month movement.'],
   '/salary-data/': ['H-1B salary data', 'Certified employer filings. Reported wages, without a paywall.'],
-  '/employers/': ['Employer sponsorship profiles', 'Public H-1B filing activity, roles, locations, and reported wages.'],
+  '/employers/': ['H-1B employer filing profiles', 'Public H-1B filing activity, roles, locations, and reported wages.'],
   '/processing-times/': ['PERM & prevailing wage tracker', 'Published Department of Labor processing months and request volumes.'],
   '/community/': ['Community searches', 'An aggregated view of submitted priority-date checks.'],
   '/methodology/': ['Sources & methodology', 'Public records. Visible assumptions. No promises about approval.'],
@@ -36,6 +38,8 @@ let processingData, processingDate = '', processingQueue = 'perm-analystReview';
 let employerQuery = '', employerState = '', employerSort = 'filings', employerPage = 1;
 let communityRequest, communityData, communityExpires = 0;
 let historyChartObserver;
+let pageMetadata, pageEmployer;
+const seoOrigin = document.querySelector('link[rel="canonical"]')?.href ? new URL(document.querySelector('link[rel="canonical"]').href).origin : null;
 const recordCommunitySearch = createCommunityRecorder();
 let profile = { country: 'India', category: 'EB2', priorityDate: '2015-01-01', chart: 'finalAction', filingPath: 'aos' };
 const timelineProfiles = { employment: { ...profile }, family: { ...profile, category: 'F2A', priorityDate: '2024-01-01' } };
@@ -54,14 +58,20 @@ function finishRender() {
     main.insertAdjacentHTML('afterbegin', `<div id="freshness-notice" class="inline-notice" role="status" style="margin:0 0 22px">${icon('info')}<span>The latest verified bulletin here is ${esc(month(bulletins.latestMonth))}. A newer month has not been verified. ${sourceLink(bulletins.sourceUrl, 'Check the official bulletin')}.</span></div>`);
   }
   createIcons({ icons });
-  const canonical = document.querySelector('link[rel="canonical"]');
-  if (canonical) canonical.href = new URL(path(), location.origin).href;
-  document.querySelector('meta[property="og:url"]')?.setAttribute('content', new URL(path(),location.origin).href);
-  document.querySelector('meta[property="og:title"]')?.setAttribute('content', document.title);
+  if (pageMetadata) applyPageMetadata(document, pageMetadata, seoOrigin, { careerData: careerIndex, employerProfile: pageEmployer });
+  if (!main.querySelector('.search-context')) main.insertAdjacentHTML('beforeend', searchContext(path()));
   document.querySelectorAll('.nav a').forEach(a => { const active = a.getAttribute('href') === path() || a.getAttribute('href') === '/employers/' && path().startsWith('/employers/'); a.classList.toggle('active', active); active ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'); });
 }
 function toast(text) { document.querySelector('.toast')?.remove(); clearTimeout(toastTimer); const element = document.createElement('div'); element.className = 'toast'; element.setAttribute('role', 'status'); element.textContent = text; document.body.append(element); toastTimer = setTimeout(() => element.remove(), 3500); }
-function heading(route, edition = '') { const [title, description] = headings[route]; document.title = `${title} | Green Card Timer`; return `<div class="page-heading"><div><h1>${title}</h1><p>${description}</p></div>${edition ? `<div class="edition"><span class="edition-dot"></span>${esc(edition)}</div>` : ''}</div>`; }
+function heading(route, edition = '') {
+  main.removeAttribute?.('data-published-route');
+  const [label, description] = headings[route];
+  const selected = route === '/visa-bulletin/' ? bulletins?.bulletins.find(b => b.month === (bulletinMonth || bulletins.latestMonth)) : null;
+  const title = selected ? `${selected.label} visa bulletin` : label;
+  pageEmployer = null;
+  pageMetadata = routeMetadata(route, { bulletinData: bulletins, careerData: careerIndex });
+  return `<div class="page-heading"><div><h1>${esc(title)}</h1><p>${description}</p></div>${edition ? `<div class="edition"><span class="edition-dot"></span>${esc(edition)}</div>` : ''}</div>`;
+}
 function metric(label, value, detail = '', color = '') { return `<div class="metric"><div class="metric-label">${esc(label)}</div><div class="metric-value ${color}">${esc(value)}</div><div class="metric-sub">${esc(detail)}</div></div>`; }
 function movement(previous, current) { const change = compareCutoffs(previous, current); if (change.type === 'unchanged') return '<span class="movement muted">No change</span>'; if (change.months !== null) return `<span class="movement ${change.months > 0 ? 'positive' : 'negative'}">${change.months > 0 ? '+' : ''}${change.months.toFixed(1)} months</span>`; return `<span class="movement muted">${esc({ current: 'Now Current', retrogressed: 'Retrogressed', unavailable: 'Unavailable', available: 'Reopened', unknown: 'Not comparable' }[change.type])}</span>`; }
 function readProfile() {
@@ -225,17 +235,32 @@ function renderEmployerDirectoryReady() {
 }
 async function renderEmployerProfile() {
   const route = path(), id = employerIdFromPath(route), token = ++careerToken;
-  main.innerHTML = '<div class="initial-loading" role="status">Loading public employer filings...</div>'; finishRender();
+  const published = main.getAttribute?.('data-published-route') === route;
+  pageEmployer = null;
+  pageMetadata = published ? null : { path: route, title: 'Employer H-1B Filings & Salaries | Green Card Timer', description: 'Public employer H-1B LCA filings, reported annualized base wages, job titles and primary worksites from Department of Labor disclosures.' };
+  if (!published) { main.removeAttribute?.('data-published-route'); main.innerHTML = '<div class="initial-loading" role="status">Loading public employer filings...</div>'; }
+  finishRender();
   try {
+    careerIndex ??= await loadCareerIndex();
+    if (!id || !careerIndex.employers.some(employer => employer.id === id)) throw new Error('Employer not found.');
     const dataset = await loadCareerRows(id);
     if (token !== careerToken || path() !== route) return;
-    careerIndex ??= await loadCareerIndex();
+    main.removeAttribute?.('data-published-route');
     const p = buildEmployerProfile(dataset);
     if (p.path !== route) history.replaceState({}, '', p.path);
-    document.title = `${p.name} H-1B Sponsorship Profile | Green Card Timer`;
+    pageEmployer = p;
+    pageMetadata = routeMetadata(p.path, { employerProfile: p });
     main.innerHTML = `<div class="page-heading"><div><h1 class="employer-title">${esc(p.name)}</h1><p>H-1B sponsorship disclosures / ${esc(p.scope.label.replaceAll('_', ' '))}</p></div><a class="button-secondary" href="/employers/">${icon('arrow-left')}Employers</a></div>${careerSummary({...p.wages,filings:p.filings})}<div class="inline-notice">${icon('info')}<span>These are certified Labor Condition Applications, not unique employees, visa approvals, open jobs, or proof of green-card sponsorship.</span></div><div class="salary-extra"><section><h2>Most filed job titles</h2><div class="table-wrap"><table><thead><tr><th>Job title</th><th>Filings</th><th>Median wage</th></tr></thead><tbody>${p.topTitles.map(r => `<tr><td>${esc(r.title)}</td><td>${number(r.filings)}</td><td>${money(r.wages.median)}</td></tr>`).join('')}</tbody></table></div></section><section><h2>Primary worksite states</h2>${histogram(p.worksiteStates.map(r => ({label:r.state,count:r.filings})))}<p class="chart-caption">Reported primary worksite, not employer headquarters.</p></section></div><section class="content-band"><h2>Monthly filing activity</h2>${histogram(p.filingMonths.map(r => ({label:month(r.month),count:r.filings})))}<p class="chart-caption">Received dates of records certified in this release. This is not a complete month-by-month application census.</p></section><div class="salary-extra"><section><h2>Reported wage distribution</h2><dl class="facts">${[['25th percentile',money(p.wages.p25)],['Median',money(p.wages.median)],['75th percentile',money(p.wages.p75)],['Lowest / highest',`${money(p.wages.min)} / ${money(p.wages.max)}`]].map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></section><section><h2>Filing details</h2><dl class="facts">${[['Earliest received',formatDate(p.firstFiled)],['Latest received',formatDate(p.lastFiled)],['Latest decision',formatDate(p.lastDecision)],['Full-time / part-time',`${number(p.fullTimeCounts.fullTime)} / ${number(p.fullTimeCounts.partTime)}`]].map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></section></div><p><a href="${esc(employerSalaryPath(p.id))}">Explore this employer's salary records ${icon('arrow-right')}</a></p><p class="data-scope">${sourceLink(p.sources[0].url,'Official DOL disclosure source')}<br>Decision-date coverage ${formatDate(p.scope.decisionFrom)} to ${formatDate(p.scope.decisionTo)}. Annualized base wages exclude equity and bonuses. Legal employer names are not merged into corporate groups. <a href="/methodology/">Coverage and limitations</a>.</p>${adSpace('employer-profile-after-activity')}`;
     finishRender();
-  } catch { if (token === careerToken) { main.innerHTML = '<div class="error-box">This employer profile is unavailable.</div><p><a href="/employers/">Browse published employers</a></p>'; finishRender(); } }
+  } catch {
+    if (token !== careerToken || path() !== route) return;
+    if (published) main.insertAdjacentHTML('afterbegin', '<div class="error-box" role="status">Interactive employer records could not be loaded. Published filing tables below remain available.</div>');
+    else {
+      pageMetadata = { path: route, title: 'Employer Profile Unavailable | Green Card Timer', description: 'This employer profile could not be loaded. Browse public Department of Labor employer filing records.', noindex: !id || Boolean(careerIndex && !careerIndex.employers.some(e => e.id === id)) };
+      main.innerHTML = '<div class="error-box">This employer profile is unavailable.</div><p><a href="/employers/">Browse published employers</a></p>';
+    }
+    finishRender();
+  }
 }
 function processingOptions() {
   const c = processingData.current;
@@ -346,6 +371,8 @@ function renderRoute() {
   stopHistoryChartObserver();
   careerToken += 1;
   const route = path();
+  if (main.getAttribute?.('data-published-route') !== route) main.removeAttribute?.('data-published-route');
+  if (!headings[route] && !route.startsWith('/employers/')) { pageEmployer = null; pageMetadata = routeMetadata(route); }
   if (timelinePath()) { timelineProfiles[categoryGroup(profile.category)] = { ...profile }; profile = { ...timelineProfiles[route === '/family-green-card/' ? 'family' : 'employment'] }; renderTimeline(); } else if (route === '/visa-bulletin/') renderBulletin(); else if (route === '/salary-data/') renderCareer(); else if (route === '/employers/') renderEmployerDirectory(); else if (route.startsWith('/employers/')) renderEmployerProfile(); else if (route === '/processing-times/') renderProcessing(); else if (route === '/community/') renderCommunity(); else if (route === '/methodology/') { renderSources(); appendWageScope(); main.querySelector('.reading').insertAdjacentHTML('beforeend','<h2>PERM and prevailing wages</h2><p>Official DOL processing months and average review durations are weekly-checked snapshots, not a live case lookup or remaining-wait forecast. PWD request counts are prevailing-wage requests, not pending labor certifications. Employer profiles summarize the same certified H-1B disclosure release used by salary search. Certification is not visa approval or proof of green-card sponsorship.</p><p><a href="https://flag.dol.gov/processingtimes" target="_blank" rel="noopener noreferrer">Official DOL processing times</a>. Community counts are aggregated submitted checks, not government data; see <a href="/privacy/">privacy and aggregation rules</a>.</p>'); } else if (route === '/privacy/') renderPrivacy(); else { main.innerHTML = '<div class="page-heading"><div><h1>Page not found</h1><p><a href="/">Return to the priority date calculator</a></p></div></div>'; finishRender(); }
 }
 document.addEventListener('click', async event => {
@@ -423,6 +450,6 @@ async function boot() {
       history.replaceState({}, '', salaryId ? employerSalaryPath(salaryId) : accepted && timelinePath() ? profileRoute(profile) : location.pathname);
     }
     renderRoute();
-  } catch { main.innerHTML = '<div class="error-box" role="alert">The verified data could not be loaded. Please try again later or consult the <a href="https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html" target="_blank" rel="noopener noreferrer">official Visa Bulletin</a>.</div>'; }
+  } catch { main.insertAdjacentHTML('afterbegin', '<div class="error-box" role="alert">Interactive data could not be loaded. Published tables below remain available. Try again later or consult the official sources.</div>'); }
 }
 boot();

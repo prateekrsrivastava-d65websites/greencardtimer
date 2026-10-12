@@ -6,20 +6,12 @@ import { Hourglass } from 'lucide';
 import { formatDate } from '../src/model.js';
 import { formatProcessingMonth } from '../src/processing.js';
 import { buildEmployerProfile, decodeCareerIndex, employerProfilePath, employerSalaryPath, selectStaticEmployers } from '../src/career.js';
+import { ROUTES, employerRoute, routeMetadata, structuredData, serializeStructuredData } from '../src/seo.js';
+import { searchContext } from '../src/search-context.js';
+
+export { ROUTES, employerRoute };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-
-export const ROUTES = [
-  { path: '/', title: 'Green Card Timer | Free Priority Date Tools', description: 'Check employment-based and family-sponsored visa bulletin cutoffs, explore transparent priority-date history, and compare public H-1B salary disclosures. Free, without an account.' },
-  { path: '/visa-bulletin/', title: 'Employment & Family Visa Bulletin | Green Card Timer', description: 'Explore official employment-based and family-sponsored final action and filing dates, historical movement, and country-by-category visa bulletin cutoffs.' },
-  { path: '/family-green-card/', title: 'Family-Based Green Card Tracker | Green Card Timer', description: 'Check family preference priority dates for F1, F2A, F2B, F3 and F4. Compare official final action and filing cutoffs and monthly history without an account.' },
-  { path: '/salary-data/', title: 'H-1B Salary Data & Sponsors | Green Card Timer', description: 'Search official Department of Labor H-1B disclosures by employer, location, and salary. Compare disclosed offers and download matching records.' },
-  { path: '/employers/', title: 'H-1B Employer Filing Profiles | Green Card Timer', description: 'Explore employer H-1B filing profiles from official Department of Labor disclosures. Compare certified LCA counts, disclosed wages, job titles and primary worksites.' },
-  { path: '/methodology/', title: 'Sources & Methodology | Green Card Timer', description: 'Read the official data sources, cutoff rules, historical trend method, and limitations behind Green Card Timer. No guaranteed approval dates.' },
-  { path: '/privacy/', title: 'Privacy | Green Card Timer', description: 'How submitted priority-date checks become public search counts, how profiles stay local, and what hosting providers receive. No account required.' },
-  { path: '/processing-times/', title: 'PERM & PWD Processing Times | Green Card Timer', description: 'Compare your filing month with official DOL PERM and prevailing-wage processing months. Weekly-checked source data, without a signup or approval predictions.' },
-  { path: '/community/', title: 'Community Search Trends | Green Card Timer', description: 'Public search counts by country, visa preference and priority-date range over the last 30 UTC days, including today. Repeat submissions count again.' },
-];
 
 export function siteOrigin(value) {
   if (!value?.trim()) return null;
@@ -78,14 +70,6 @@ function profileTable(label, headings, rows) {
   return `<h2>${xml(label)}</h2><div class="table-wrap"><table aria-label="${xml(label)}"><thead><tr>${headings.map(heading => `<th scope="col">${xml(heading)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map((value, i) => i === 0 ? `<th scope="row">${xml(value)}</th>` : `<td>${xml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
-export function employerRoute(profile) {
-  return {
-    path: profile.path,
-    title: `${profile.name} H-1B Filings & Salaries | Green Card Timer`,
-    description: `${profile.name}: ${count(profile.filings)} certified H-1B LCA filings in ${String(profile.scope?.label ?? 'the published DOL release').replaceAll('_', ' ')}. Explore disclosed annualized wages, job titles and primary worksites.`,
-  };
-}
-
 function employerContent(profile) {
   const wages = profile.wages;
   const disclosure = profile.sources[0]?.url || 'https://www.dol.gov/agencies/eta/foreign-labor/performance';
@@ -114,7 +98,7 @@ export function initialContent(route, { bulletinData, careerData, employerProfil
   let title;
   let body;
   if (route.path === '/visa-bulletin/') {
-    title = 'Employment & Family Visa Bulletin';
+    title = latest ? `${latest.label} Visa Bulletin` : 'Employment & Family Visa Bulletin';
     body = latest ? `${bulletinCharts(bulletinData, latest, 'employment')}${bulletinCharts(bulletinData, latest, 'family')}` : '<p>The latest verified bulletin tables are temporarily unavailable.</p>';
     body += `<p>Current (C) means no cutoff; Unavailable (U) means no visas authorized. A priority date must be strictly earlier than a dated cutoff. Employment tables cover EB-1, EB-2, EB-3, other workers, and EB-5 unreserved. Family tables cover F1, F2A, F2B, F3 and F4.</p><p>USCIS selects the employment and family I-485 charts separately each month. An unverified choice remains unknown. ${sourceLink(dos, 'Official State Department bulletin')}. ${sourceLink(uscis, 'Verify the applicable USCIS chart')} before filing. A cutoff does not predict approval.</p>`;
   } else if (route.path === '/family-green-card/') {
@@ -168,19 +152,20 @@ export function initialContent(route, { bulletinData, careerData, employerProfil
     title = 'Privacy';
     body = '<h2>Recorded searches</h2><p>Submitted employment and family priority-date checks are automatically recorded and displayed as public community totals. The browser sends country of chargeability, visa preference category and a priority-date range to our Cloudflare counter. Dates are grouped into five-year bands, plus before 2000 and 2030 or later. Repeat submissions count again.</p><p>There is no opt-in, per-tab limit, duplicate filtering or browser-signal exclusion. Public charts cover the last 30 UTC calendar days, including today, and show exact counts from the first search. Accepted submissions update the submitter\'s charts from the counter response; totals for other visitors can be cached for up to one minute.</p><p>The database stores separate daily counts for country, category and date range. It does not store exact dates, raw submissions, combinations, names, receipt numbers, visitor IDs, IP addresses or browser identifiers. Browsing, typing, loading or saving profiles, chart changes, employer searches and PERM dates are not recorded by this counter. Counts are search activity, not unique people or a representative applicant survey.</p><h2>Storage and availability</h2><p>Daily rollups older than 90 days are pruned when a new day receives a search; inactive rollups may remain longer. A 10,000-search daily cap bounds database work on the free tier. If a resource limit or outage prevents recording, the calculator still works.</p><h2>Local profiles</h2><p>Priority-date calculations run in your browser. Saved profiles use local storage on this device; there is no account or application profile database. Shared profile links contain their fields, so recipients and hosting infrastructure may receive those details when a link is opened.</p><h2>Public data and hosting</h2><p>The browser downloads public bulletin and employer data. Hosting providers receive ordinary requests and may keep security and operational logs, including IP addresses. These platform logs are separate from the search counters. Official external links have their own policies.</p><h2>No third-party tracking</h2><p>This version includes no advertising scripts, third-party analytics, payment processing, or account cookies. CSV exports and printing happen locally in your browser.</p><p>Last updated: October 11, 2026.</p>';
   } else {
-    title = 'Green Card Timer';
+    title = 'Green Card Wait Time & Priority Date Tracker';
     body = '<p>Free employment-based and family preference priority-date checks and public salary disclosures. No account required.</p>';
     if (latest) {
       body += `<h2>${xml(latest.label)} India EB-2</h2><div class="table-wrap"><table><thead><tr><th scope="col">Final Action Date</th><th scope="col">Dates for Filing</th></tr></thead><tbody><tr><td>${xml(formatDate(latest.charts.finalAction.EB2.India))}</td><td>${xml(formatDate(latest.charts.filing.EB2.India))}</td></tr></tbody></table></div><p>A priority date must be strictly earlier than the cutoff. Final action availability does not establish individual approval. ${sourceLink(uscis, 'Check USCIS chart selection')} before filing I-485.</p><p>${sourceLink(dos, `${latest.label} official bulletin`)}.</p>`;
     }
-    body += '<p><a href="/visa-bulletin/">Employment and family visa bulletin tables</a> | <a href="/family-green-card/">Family-based green card tracker</a> | <a href="/salary-data/">H-1B salary disclosures</a> | <a href="/employers/">Employer filing profiles</a> | <a href="/methodology/">Sources and limitations</a></p>';
+    body += '<p><a href="/salary-data/">H-1B salary disclosures</a> | <a href="/employers/">Employer filing profiles</a> | <a href="/methodology/">Sources and limitations</a></p>';
     body += '<section id="community-trends" aria-labelledby="community-trends-heading"><h2 id="community-trends-heading">Community Search Trends</h2><p>Country groups, visa preferences and priority-date ranges from submitted checks. Live charts load when JavaScript is available; no live counts are embedded in this page.</p><p>Valid priority-date checks are counted automatically, including repeat submissions. Charts cover the last 30 UTC calendar days, including today, and show exact counts from the first search. These are search counts, not unique people or government queue data.</p><p><a href="/community/">Community trends</a> | <a href="/privacy/">Data practices</a></p></section>';
   }
-  return `<div class="page-heading"><div><h1>${xml(title)}</h1></div></div><article class="reading">${body}</article>`;
+  return `<div class="page-heading"><div><h1>${xml(title)}</h1></div></div><article class="reading">${body}</article>${searchContext(route.path)}`;
 }
 
 export function routeHTML(html, route, origin = null, data = {}) {
   const $ = load(html);
+  route = routeMetadata(route.path, data);
   $('title').text(route.title);
   function meta(attribute, name, content) {
     $(`meta[${attribute}="${name}"]`).remove();
@@ -200,7 +185,10 @@ export function routeHTML(html, route, origin = null, data = {}) {
     $('head').append($('<link>').attr({ rel: 'canonical', href: url }));
     meta('property', 'og:url', url);
   }
-  $('#main').html(initialContent(route, data));
+  $('#page-schema').remove();
+  const graph = structuredData(route, origin, data);
+  if (graph) $('head').append(`<script id="page-schema" type="application/ld+json">${serializeStructuredData(graph)}</script>`);
+  $('#main').attr('data-published-route', route.path).html(initialContent(route, data));
   $('.nav a').each((_, element) => {
     const active = $(element).attr('href') === route.path;
     $(element).toggleClass('active', active);
