@@ -24,11 +24,12 @@ test('processing route publishes sourced queue and prevailing wage tables withou
   assert.equal($('a').first().attr('href'),'https://flag.dol.gov/processingtimes');
 });
 
-test('community and privacy static pages disclose optional aggregation without fabricated counts', () => {
+test('community and privacy static pages disclose automatic coarse aggregation without fabricated counts', () => {
   const community = load(initialContent(ROUTES.find(r=>r.path==='/community/')));
   const privacy = load(initialContent(ROUTES.find(r=>r.path==='/privacy/')));
   for (const text of [community.text(),privacy.text()]) {
-    assert.match(text,/unchecked/);
+    assert.match(text,/automatically/);
+    assert.doesNotMatch(text,/unchecked|Optional community|explicit contributed check/);
     assert.match(text,/100 contributions/);
     assert.match(text,/groups below 20/);
     assert.match(text,/five-year date range/);
@@ -36,6 +37,36 @@ test('community and privacy static pages disclose optional aggregation without f
   assert.equal(community('table').length,0);
   assert.match(privacy.text(),/inactive rollups may remain longer/);
   assert.match(privacy.text(),/Global Privacy Control/);
+  assert.match(privacy.text(),/Exact dates stay in your browser/);
+  assert.match(privacy.text(),/platform logs are separate from the aggregate counters/);
+  assert.match(privacy.text(),/Browsing, typing, saved-profile loading, saving and chart changes do not contribute/);
+  assert.match(privacy.text(),/limit of 10 contributions per tab/);
+  for (const path of ['/privacy/', '/community/']) {
+    assert.doesNotMatch(ROUTES.find(route => route.path === path).description,/optional/i);
+  }
+});
+
+test('home initial HTML includes community trends without fabricated live charts or counts', () => {
+  const $ = load(initialContent(ROUTES.find(route => route.path === '/'), { bulletinData }));
+  const section = $('#community-trends');
+  assert.equal(section.length,1);
+  assert.equal(section.find('h2').text(),'Community Search Trends');
+  assert.equal(section.attr('aria-labelledby'), section.find('h2').attr('id'));
+  assert.equal(section.find('a[href="/privacy/"]').length,1);
+  assert.equal(section.find('table, canvas, svg').length,0);
+  assert.match(section.text(),/no live counts are embedded/);
+  assert.match(section.text(),/counted automatically/);
+  assert.match(section.text(),/100 contributions/);
+  assert.match(section.text(),/groups below 20/);
+  assert.doesNotMatch(section.text(),/unchecked|optional|\d[\d,.]*%|collecting \d/i);
+});
+
+test('methodology identifies automatic submitted checks and excludes background activity', () => {
+  const $ = load(initialContent(ROUTES.find(route => route.path === '/methodology/')));
+  assert.match($.text(),/Valid submitted priority-date checks automatically add/);
+  assert.match($.text(),/saved-profile loading and chart changes do not submit a contribution/);
+  assert.match($.text(),/separate marginal distributions, not combinations/);
+  assert.equal($('a[href="/privacy/"]').length,1);
 });
 const employer = { id: 'abcdef0123456789', name: 'EXAMPLE & SONS <script>bad</script>', filings: 2, median: 150000 };
 const employerRows = [

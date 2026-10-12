@@ -30,7 +30,7 @@ export function validContribution(value) {
     && includesId(COMMUNITY_PERIODS, value.priorityPeriod));
 }
 
-// Call only after explicit consent. The exact date never enters the payload.
+// Call only for a valid submitted search. The exact date never enters the payload.
 export function buildSearchContribution(profile) {
   if (!profile || !parseDate(profile.priorityDate)) return null;
   const year = Number(profile.priorityDate.slice(0, 4));

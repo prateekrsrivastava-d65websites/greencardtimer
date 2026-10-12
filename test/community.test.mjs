@@ -142,7 +142,7 @@ test('first new daily insertion prunes old aggregate rows to a ninety-day active
   assert.deepEqual(db.sqlite.prepare('SELECT day FROM community_daily ORDER BY day').all().map(item => item.day), ['2026-01-02', '2026-04-01']);
 });
 
-test('POST accepts same-origin opt-in coarse data without recording headers or exact dates', async t => {
+test('POST accepts same-origin coarse data without recording headers or exact dates', async t => {
   const db = database(t);
   const response = await onRequest(context(db, { method: 'POST', body: sample, headers: { 'User-Agent': 'not retained', 'CF-Connecting-IP': '192.0.2.10', 'Content-Type': 'application/json; charset=utf-8' } }));
   assert.equal(response.status, 202);
