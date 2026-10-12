@@ -28,7 +28,7 @@ async function browserHarness({ failCareerRows = false } = {}) {
   const source = await readFile(url, 'utf8');
   // Export the existing functions for the harness without changing production module exports.
   const app = new vm.SourceTextModule(`${source}\nexport { historyChart, observeHistoryChart, stopHistoryChartObserver, renderTimeline, renderRoute, renderBulletin, renderEmployerProfile };
-    export function configureTest(data, config, range) { bulletins = data; model = config; chartWindow = range; }
+    export function configureTest(data, config, range) { bulletins = data; model = config; chartWindow = range; profile.priorityDate = '2015-01-01'; timelineHasResult.employment = true; }
     export function configureTestMonth(value) { bulletinMonth = value; }
     export function configureTestCareer(value) { careerIndex = value; }
     export function testMetadata() { return pageMetadata; }`, { context });

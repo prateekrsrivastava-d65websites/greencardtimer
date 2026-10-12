@@ -131,7 +131,7 @@ export function parseProcessingHTML(html) {
 }
 
 export async function fetchProcessingHTML(fetchImpl = fetch) {
-  const response = await fetchImpl(PROCESSING_SOURCE_URL, { headers: { 'User-Agent': 'GreenCardTimer-public-data-refresh/1.0 (https://greencardtimer.pages.dev/)', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(30_000) });
+  const response = await fetchImpl(PROCESSING_SOURCE_URL, { headers: { 'User-Agent': 'GreenCardTimer-public-data-refresh/1.0 (https://greencardtimer.com/)', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(30_000) });
   if (!response.ok) throw new Error(`Official processing source returned HTTP ${response.status}.`);
   if (!(response.headers.get('content-type') ?? '').includes('text/html')) throw new Error('Official processing source did not return HTML.');
   const reader = response.body.getReader();

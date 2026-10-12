@@ -29,3 +29,17 @@
 .header .brand-copy{display:grid;gap:4px;min-width:0}
 .header .brand-name{display:block;line-height:1.25;white-space:nowrap}
 .header .brand-subtitle{font-size:12px;font-weight:600;line-height:1.4;color:var(--green);white-space:normal}
+.community-beside{min-width:0}
+.community-beside .section-heading{flex-wrap:wrap;align-items:baseline;margin-top:0}
+.community-beside .section-heading h2{font-size:16px}
+.community-beside .method-link{margin-top:0}
+.community-beside .community-summary{margin:22px 0 26px}
+.community-beside .community-charts{grid-template-columns:minmax(0,1fr);gap:20px}
+.community-beside .community-charts>section{border-right:0;border-bottom:1px solid var(--line);padding:0 0 20px}
+.community-beside .community-charts>section:last-child{border-bottom:0;padding-bottom:0}
+.community-beside .community-charts h3{margin-bottom:12px}
+.community-beside .community-donut{grid-template-columns:128px minmax(0,1fr);gap:24px;align-items:center}
+.community-beside .community-donut-chart{width:128px}
+.community-beside .community-legend>li{padding:6px 0}
+@media(max-width:760px){.community-beside{padding-top:24px;border-top:1px solid var(--line)}.community-beside .community-donut{grid-template-columns:176px minmax(0,1fr);gap:24px}.community-beside .community-donut-chart{width:176px}}
+@media(max-width:520px){.community-beside .community-donut{grid-template-columns:minmax(0,1fr);gap:18px}}

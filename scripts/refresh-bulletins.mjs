@@ -154,7 +154,7 @@ export async function fetchOfficialHTML(sourceUrl, fetchImpl = fetch, validate =
   for (const host of OFFICIAL_HOSTS) {
     const url = `https://${host}${source.pathname}`;
     try {
-      const response = await fetchImpl(url, { headers: { 'User-Agent': 'GreenCardTimer-public-data-refresh/1.0 (https://greencardtimer.pages.dev/)', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(30_000) });
+      const response = await fetchImpl(url, { headers: { 'User-Agent': 'GreenCardTimer-public-data-refresh/1.0 (https://greencardtimer.com/)', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(30_000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const type = response.headers.get('content-type') ?? '';
       if (!type.includes('text/html')) throw new Error(`Expected HTML; received ${type}`);

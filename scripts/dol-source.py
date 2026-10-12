@@ -9,7 +9,7 @@ import urllib.request
 
 SOURCE_PAGE = "https://www.dol.gov/agencies/eta/foreign-labor/performance"
 MAX_PAGE_BYTES = 2 * 1024 * 1024
-USER_AGENT = "GreenCardTimer data updater (+https://greencardtimer.pages.dev)"
+USER_AGENT = "GreenCardTimer data updater (+https://greencardtimer.com)"
 DISCLOSURE_FILENAME = re.compile(
     r"LCA_Disclosure_Data_FY(20\d{2})(?:_Q([1-4]))?\.xlsx\Z"
 )

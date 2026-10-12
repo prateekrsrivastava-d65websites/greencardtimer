@@ -41,8 +41,9 @@ let historyChartObserver;
 let pageMetadata, pageEmployer;
 const seoOrigin = document.querySelector('link[rel="canonical"]')?.href ? new URL(document.querySelector('link[rel="canonical"]').href).origin : null;
 const recordCommunitySearch = createCommunityRecorder();
-let profile = { country: 'India', category: 'EB2', priorityDate: '2015-01-01', chart: 'finalAction', filingPath: 'aos' };
-const timelineProfiles = { employment: { ...profile }, family: { ...profile, category: 'F2A', priorityDate: '2024-01-01' } };
+let profile = { country: 'India', category: 'EB2', priorityDate: '', chart: 'finalAction', filingPath: 'aos' };
+const timelineProfiles = { employment: { ...profile }, family: { ...profile, category: 'F2A' } };
+const timelineHasResult = { employment: false, family: false };
 const stored = () => { try { const value = JSON.parse(localStorage.getItem('gct.profiles') || '[]'); return Array.isArray(value) ? value.filter(p => bulletins.countries.some(c => c.id === p.country) && bulletins.categories.some(c => c.id === p.category) && parseDate(p.priorityDate) && ['filing', 'finalAction'].includes(p.chart) && ['aos', 'consular'].includes(p.filingPath)).slice(0, 8) : []; } catch { return []; } };
 const profileKey = p => `${p.country}:${p.category}:${p.priorityDate}:${p.chart}:${p.filingPath}`;
 const countryLabel = id => bulletins.countries.find(c => c.id === id)?.label || id;
@@ -143,6 +144,13 @@ function renderTimeline() {
   stopHistoryChartObserver();
   timelineProfiles[categoryGroup(profile.category)] = { ...profile };
   const family = timelineRoute() === '/family-green-card/';
+  if (!timelineHasResult[family ? 'family' : 'employment']) {
+    const latest = bulletins.bulletins.find(b => b.month === bulletins.latestMonth);
+    main.innerHTML = `${heading(timelineRoute(), `${latest.label} bulletin`)}<div class="workspace"><aside>${profilePanel()}</aside>${homeCommunity(true)}</div>${adSpace('home-after-community')}`;
+    finishRender();
+    void loadCommunitySection();
+    return;
+  }
   const result = evaluateProfile(profile, bulletins, model);
   const status = { waiting: ['clock-3', 'wait', 'Your priority date has not met the cutoff', 'The cutoff must move past your priority date.'], current: ['circle-check', '', 'Your priority date meets this cutoff', 'Visa availability alone does not mean your case will be approved.'], unavailable: ['circle-alert', 'unknown', 'This category is unavailable', 'No visas are authorized in this category for this bulletin.'], unknown: ['circle-alert', 'unknown', 'Cutoff not verified', 'Check the official source before making a decision.'] }[result.status];
   if (!status) { main.innerHTML = '<div class="error-box">Enter a valid priority date.</div>'; finishRender(); return; }
@@ -155,10 +163,10 @@ function renderTimeline() {
   ${profile.filingPath === 'aos' && !result.chartChoiceKnown ? `<div class="inline-notice">${icon('info')}<span>USCIS ${family ? 'family ' : ''}chart selection is not verified here. ${sourceLink('https://www.uscis.gov/visabulletininfo', 'Check the monthly chart')} before filing I-485.</span></div>` : `<p class="chart-caption">${profile.filingPath === 'consular' ? 'Dates for Filing concern document submission when instructed by the National Visa Center. They do not authorize approval.' : 'Check all USCIS eligibility requirements before filing.'}</p>`}${family && profile.category === 'F2A' ? `<p class="chart-caption">F2A per-country exemptions and allocation limits also apply. ${sourceLink(latest.sourceUrl, 'Check this bulletin\u0027s F2A notes')}.</p>` : ''}</div>
   <div class="section-heading"><div><h2>Cutoff movement</h2><p>${profile.chart === 'finalAction' ? 'Final action dates' : 'Dates for filing'} / actual published history</p></div><div class="segment" role="group" aria-label="History range">${[6, 12, 24].map(n => `<button data-window="${n}" aria-pressed="${chartWindow === n}" class="${chartWindow === n ? 'active' : ''}">${n}m</button>`).join('')}</div></div>${historyChart(result.trend.points)}<p class="chart-caption">${result.trend.advancedMonths} advancing months, ${result.trend.unchangedMonths} unchanged, ${result.trend.retrogressedMonths} retrogressions in the verified history. Gaps mark Current or Unavailable.</p>
   ${family ? `<section class="family-scope"><h2>Family preference categories</h2><dl>${routeCategories().map(c => `<div><dt>${esc(c.label)}</dt><dd>${esc(c.description || '')}</dd></div>`).join('')}</dl><p class="chart-caption">Immediate relatives of U.S. citizens are not covered by these preference cutoffs. Age-out rules, category changes and individual eligibility are not calculated here. Published cutoffs do not predict your approval date.</p></section>` : `<section class="scenario-band"><div class="section-heading" style="margin-top:0"><h2>Illustrative cutoff scenarios</h2></div>${result.scenarios ? `<div class="scenario-grid">${result.scenarios.map(s => `<div class="scenario ${s.id === 'typical' ? 'base' : ''}"><div class="scenario-label">${icon('trending-up')}${esc(s.label.replace(' historical', ''))}</div><div class="scenario-date">${s.date ? month(s.date) : s.beyondHorizon ? 'Beyond 10 years' : 'No positive pace'}</div><p class="scenario-detail">${s.months && !s.beyondHorizon ? `${s.months} calendar months` : esc(s.reason)}</p></div>`).join('')}</div>` : `<div class="empty-estimate">${esc(result.forecastReason)}</div>`}<p class="chart-caption">${result.scenarios ? esc(result.forecastReason) : 'There is no reliable individual approval date in the public cutoff data.'}</p><a class="method-link" href="/methodology/">How these scenarios work ${icon('arrow-up-right')}</a></section>`}${adSpace(family ? 'family-between-sections' : 'timeline-between-sections')}
-  <details class="details"><summary>Recent published cutoffs</summary><div class="table-wrap history-table"><table><thead><tr><th>Bulletin</th><th>Cutoff</th><th>Movement</th></tr></thead><tbody>${result.trend.points.slice(-12).reverse().map(p => { const previous = result.trend.points.find((q, i, all) => all[i + 1]?.month === p.month); return `<tr><td>${sourceLink(p.sourceUrl, month(p.month))}</td><td class="table-date">${formatDate(p.cutoff)}</td><td>${previous ? movement(previous.cutoff, p.cutoff) : '\u2014'}</td></tr>`; }).join('')}</tbody></table></div></details></section></div>${family ? '' : homeCommunity()}`;
+  <details class="details"><summary>Recent published cutoffs</summary><div class="table-wrap history-table"><table><thead><tr><th>Bulletin</th><th>Cutoff</th><th>Movement</th></tr></thead><tbody>${result.trend.points.slice(-12).reverse().map(p => { const previous = result.trend.points.find((q, i, all) => all[i + 1]?.month === p.month); return `<tr><td>${sourceLink(p.sourceUrl, month(p.month))}</td><td class="table-date">${formatDate(p.cutoff)}</td><td>${previous ? movement(previous.cutoff, p.cutoff) : '\u2014'}</td></tr>`; }).join('')}</tbody></table></div></details></section></div>${homeCommunity()}`;
   finishRender();
   observeHistoryChart(result.trend.points);
-  if (!family) void loadCommunitySection();
+  void loadCommunitySection();
 }
 function renderBulletin() {
   bulletinMonth ||= bulletins.latestMonth;
@@ -300,8 +308,8 @@ function compareProcessingDate() {
 function communityContainer() {
   return '<div id="community-totals" class="community-totals" aria-live="polite"><p class="chart-caption" role="status">Loading community totals...</p></div>';
 }
-function homeCommunity() {
-  return `<section id="community-trends" class="content-band home-community" aria-labelledby="community-trends-heading"><div class="section-heading"><div><h2 id="community-trends-heading">Community Search Trends</h2><p>Recorded searches / last 30 UTC days, including today</p></div><a class="method-link" href="/community/">About these counts ${icon('arrow-up-right')}</a></div>${communityContainer()}<p class="chart-caption">Includes repeat searches. These are search counts, not unique people or government queue data. <a href="/privacy/">Data practices</a>.</p></section>${adSpace('home-after-community')}`;
+function homeCommunity(beside = false) {
+  return `<section id="community-trends" class="home-community ${beside ? 'community-beside' : 'content-band'}" aria-labelledby="community-trends-heading"><div class="section-heading"><div><h2 id="community-trends-heading">Community Search Trends</h2><p>Recorded searches / last 30 UTC days, including today</p></div><a class="method-link" href="/community/">About these counts ${icon('arrow-up-right')}</a></div>${communityContainer()}<p class="chart-caption">Includes repeat searches. These are search counts, not unique people or government queue data. <a href="/privacy/">Data practices</a>.</p></section>${beside ? '' : adSpace('home-after-community')}`;
 }
 function communitySummary(data) {
   return `<div class="community-summary"><strong>${number(data.total)}</strong><span>recorded ${data.total === 1 ? 'search' : 'searches'}</span><small>${formatDate(data.window.from)} to ${formatDate(data.window.through)} / UTC</small></div>${data.total ? `<div class="community-charts">${[['Country of chargeability','countries'],['Visa preference category','categories'],['Priority-date range','priorityPeriods']].map(([title,dimension]) => `<section aria-labelledby="community-${dimension}-title"><h3 id="community-${dimension}-title">${title}</h3>${communityDonut(data[dimension], { title, total: data.total, dimension })}</section>`).join('')}</div>` : '<div class="community-empty"><h3>No recorded searches in this period</h3></div>'}`;
@@ -379,9 +387,17 @@ document.addEventListener('click', async event => {
   const a = event.target.closest('a');
   if (a && a.origin === location.origin && !a.hash && !a.target && !a.hasAttribute('download') && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); history.pushState({}, '', a.pathname + a.search); renderRoute(); window.scrollTo(0, 0); return; }
   const target = event.target.closest('button'); if (!target) return;
-  if (target.dataset.chart && readProfile()) { profile.chart = target.dataset.chart; renderTimeline(); }
+  if (target.dataset.chart) {
+    if (timelineHasResult[categoryGroup(profile.category)]) {
+      if (readProfile()) { profile.chart = target.dataset.chart; renderTimeline(); }
+    } else {
+      profile.chart = target.dataset.chart;
+      timelineProfiles[categoryGroup(profile.category)] = { ...profile };
+      document.querySelectorAll('[data-chart]').forEach(control => { const active = control.dataset.chart === profile.chart; control.classList.toggle('active', active); control.setAttribute('aria-pressed', String(active)); });
+    }
+  }
   if (target.dataset.window && readProfile()) { chartWindow = Number(target.dataset.window); renderTimeline(); }
-  if (target.dataset.loadProfile) { profile = { ...stored()[Number(target.dataset.loadProfile)] }; timelineProfiles[categoryGroup(profile.category)] = { ...profile }; if (path() !== profileRoute(profile)) history.pushState({}, '', profileRoute(profile)); renderTimeline(); }
+  if (target.dataset.loadProfile) { profile = { ...stored()[Number(target.dataset.loadProfile)] }; timelineProfiles[categoryGroup(profile.category)] = { ...profile }; timelineHasResult[categoryGroup(profile.category)] = true; if (path() !== profileRoute(profile)) history.pushState({}, '', profileRoute(profile)); renderTimeline(); }
   if (target.dataset.bulletinGroup) { bulletinGroup = target.dataset.bulletinGroup; renderBulletin(); }
   if (target.dataset.employer) { selectEmployer(target.dataset.employer); return; }
   const action = target.dataset.action;
@@ -399,6 +415,7 @@ document.addEventListener('submit', event => {
   if (event.target.id === 'profile-form') {
     event.preventDefault();
     if (readProfile()) {
+      timelineHasResult[categoryGroup(profile.category)] = true;
       void recordCommunitySearch({ ...profile }).then(response => { if (response?.summary) publishCommunitySummary(response.summary); });
       renderTimeline();
     }
@@ -445,7 +462,7 @@ async function boot() {
       const accepted = fields.length > 0 && bulletins.countries.some(c => c.id === candidate.country)
         && bulletins.categories.some(c => c.id === candidate.category) && parseDate(candidate.priorityDate)
         && ['filing', 'finalAction'].includes(candidate.chart) && ['aos', 'consular'].includes(candidate.filingPath);
-      if (accepted) { profile = candidate; timelineProfiles[categoryGroup(profile.category)] = { ...profile }; }
+      if (accepted) { profile = candidate; timelineProfiles[categoryGroup(profile.category)] = { ...profile }; timelineHasResult[categoryGroup(profile.category)] = true; }
       const salaryId = path() === '/salary-data/' ? employerIdFromSearch(location.search) : null;
       history.replaceState({}, '', salaryId ? employerSalaryPath(salaryId) : accepted && timelinePath() ? profileRoute(profile) : location.pathname);
     }
