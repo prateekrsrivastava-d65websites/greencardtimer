@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { cutoffStatus, compareCutoffs, deriveSeries, evaluateProfile, parseDate } from '../src/model.js';
+import { load } from 'cheerio';
+import { buildModelData, cutoffStatus, compareCutoffs, deriveSeries, evaluateProfile, monthIndex, parseDate } from '../src/model.js';
 import { discoverBulletins, parseBulletinHTML, parseDOSDate, validateBulletin } from '../scripts/refresh-bulletins.mjs';
+import { bulletinData, modelData } from './fixtures/model-bulletins.mjs';
 
-const bulletinData = JSON.parse(await readFile(new URL('../public/data/bulletins.json', import.meta.url), 'utf8'));
-const modelData = JSON.parse(await readFile(new URL('../public/data/model.json', import.meta.url), 'utf8'));
+const productionBulletinData = JSON.parse(await readFile(new URL('../public/data/bulletins.json', import.meta.url), 'utf8'));
+const productionModelData = JSON.parse(await readFile(new URL('../public/data/model.json', import.meta.url), 'utf8'));
 const profile = { country: 'India', category: 'EB2', priorityDate: '2015-01-01', chart: 'finalAction', filingPath: 'aos' };
 
 test('a priority date must be strictly earlier than the dated cutoff', () => {
@@ -52,7 +54,7 @@ test('retrogression is retained and C/U are excluded from numeric window rates',
   const trend = deriveSeries(bulletinData, 'India', 'EB2', 'finalAction');
   assert.ok(trend.retrogressedMonths > 0);
   assert.equal(trend.unavailableMonths, 3);
-  assert.ok(trend.completeWindows < 19);
+  assert.ok(trend.completeWindows < bulletinData.bulletins.length - modelData.methodology.parameters.rollingWindowMonths);
   assert.ok(trend.positiveWindows >= 3);
 });
 
@@ -68,16 +70,27 @@ test('illustrative scenarios are labeled and never stand in for approval dates',
   assert.ok(remote.scenarios.every(scenario => scenario.beyondHorizon && scenario.date === null));
 });
 
-test('all sourced bulletin snapshots have fifty complete tracked cells', () => {
-  assert.equal(bulletinData.bulletins.length, 25);
-  assert.equal(bulletinData.bulletins[0].month, '2026-10');
-  assert.equal(bulletinData.bulletins.at(-1).month, '2024-10');
-  for (const bulletin of bulletinData.bulletins) {
+test('production bulletins retain twenty-five contiguous months and fifty complete tracked cells', () => {
+  assert.equal(productionBulletinData.bulletins.length, 25);
+  assert.equal(productionBulletinData.bulletins[0].month, productionBulletinData.latestMonth);
+  const latestIndex = monthIndex(productionBulletinData.latestMonth);
+  assert.notEqual(latestIndex, null);
+  assert.equal(productionBulletinData.countries.length, 5);
+  assert.equal(productionBulletinData.categories.length, 5);
+  assert.equal(new Set(productionBulletinData.countries.map(country => country.id)).size, 5);
+  assert.equal(new Set(productionBulletinData.categories.map(category => category.id)).size, 5);
+  for (const [offset, bulletin] of productionBulletinData.bulletins.entries()) {
+    assert.equal(monthIndex(bulletin.month), latestIndex - offset);
+    assert.equal(new URL(bulletin.sourceUrl).protocol, 'https:');
     assert.equal(new URL(bulletin.sourceUrl).hostname, 'travel.state.gov');
+    assert.deepEqual(Object.keys(bulletin.charts).sort(), ['filing', 'finalAction']);
+    assert.equal(Object.values(bulletin.charts).flatMap(chart => Object.values(chart).flatMap(Object.values)).length, 50);
     validateBulletin(bulletin);
   }
-  assert.equal(bulletinData.bulletins[0].charts.finalAction.EB3.China, '2022-01-08');
-  assert.equal(bulletinData.bulletins[0].charts.filing.EB2.India, '2015-01-15');
+});
+
+test('production model summaries match the current published bulletin history', () => {
+  assert.deepEqual(buildModelData(productionBulletinData, productionModelData), productionModelData);
 });
 
 function officialShapedHTML() {
@@ -85,8 +98,8 @@ function officialShapedHTML() {
   const columns = ['ROW', 'China', 'India', 'Mexico', 'Philippines'];
   const labels = { EB1: '1st', EB2: '2nd', EB3: '3rd', EB3OW: 'Other Workers', EB5: '5th Unreserved (including C5, T5, I5, R5)' };
   const token = value => value === 'C' || value === 'U' ? value : `${value.slice(8, 10)}${new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' }).format(parseDate(value)).toUpperCase()}${value.slice(2, 4)}`;
-  const tables = ['finalAction', 'filing'].map(chart => `<table><tr><th>Employment-based</th><th>All Chargeability Areas Except Those Listed</th><th>CHINA-mainland born</th><th>INDIA</th><th>MEXICO</th><th>PHILIPPINES</th></tr>${Object.entries(labels).map(([category, label]) => `<tr><td>${label}</td>${columns.map(country => `<td>${token(latest.charts[chart][category][country])}</td>`).join('')}</tr>`).join('')}</table>`).join('');
-  return `<html><body><h1>Visa Bulletin For October 2026</h1>${tables}<p>CA/VO: September 4, 2026</p></body></html>`;
+  const tables = ['finalAction', 'filing'].map(chart => `<p>${chart === 'finalAction' ? 'A. FINAL ACTION DATES FOR EMPLOYMENT-BASED PREFERENCE CASES' : 'B. DATES FOR FILING OF EMPLOYMENT-BASED VISA APPLICATIONS'}</p><table><tr><th>Employment-based</th><th>All Chargeability Areas Except Those Listed</th><th>CHINA-mainland born</th><th>INDIA</th><th>MEXICO</th><th>PHILIPPINES</th></tr>${Object.entries(labels).map(([category, label]) => `<tr><td>${label}</td>${columns.map(country => `<td>${token(latest.charts[chart][category][country])}</td>`).join('')}</tr>`).join('')}</table>`).join('');
+  return `<html><body><h1>Visa Bulletin For ${latest.label}</h1>${tables}<p>CA/VO: September 4, 2026</p></body></html>`;
 }
 
 test('structured HTML parser maps DOS column order and fails closed on malformed tables', () => {
@@ -98,6 +111,11 @@ test('structured HTML parser maps DOS column order and fails closed on malformed
   assert.throws(() => parseBulletinHTML(html.replace('01NOV13', 'not-a-date'), parsed.sourceUrl), /Unexpected DOS/);
   assert.throws(() => parseBulletinHTML(html.replaceAll('Other Workers', 'Missing row'), parsed.sourceUrl), /missing a tracked category/);
   assert.throws(() => parseBulletinHTML(html, 'https://example.com/bulletin'), /official State Department/);
+  assert.throws(() => parseBulletinHTML(html.replace('FINAL ACTION DATES FOR EMPLOYMENT-BASED PREFERENCE CASES', 'Changed heading'), parsed.sourceUrl), /no recognized chart heading/);
+  const $ = load(html);
+  const firstSection = $('p').first().add($('table').first()).remove();
+  $('body').append(firstSection);
+  assert.deepEqual(parseBulletinHTML($.html(), parsed.sourceUrl).charts, parsed.charts);
 });
 
 test('link discovery follows official links rather than guessed URLs', () => {

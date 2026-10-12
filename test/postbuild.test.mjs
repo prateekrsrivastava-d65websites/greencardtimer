@@ -47,9 +47,10 @@ test('initial bulletin HTML publishes both sourced fifty-cell cutoff charts', ()
   assert.equal($('table').length, 2);
   assert.equal($('tbody tr').length, 10);
   assert.equal($('tbody td').length, 50);
-  assert.match($.text(), /October 2026/);
+  const latest = bulletinData.bulletins.find(bulletin => bulletin.month === bulletinData.latestMonth);
+  assert.ok($.text().includes(latest.label));
   assert.match($.text(), /strictly earlier/);
-  assert.equal($('a').first().attr('href'), bulletinData.bulletins[0].sourceUrl);
+  assert.equal($('a').first().attr('href'), latest.sourceUrl);
 });
 
 test('initial salary HTML identifies full release scope without inventing absent counts', () => {
@@ -64,11 +65,15 @@ test('initial salary HTML identifies full release scope without inventing absent
 });
 
 test('unchanged bulletin tables ignore key order and verification-only timestamps', () => {
-  const old = bulletinData.bulletins[0];
-  const next = structuredClone(old);
-  next.verifiedAt = '2026-10-12';
-  next.charts.finalAction.EB2 = Object.fromEntries(Object.entries(next.charts.finalAction.EB2).reverse());
-  assert.equal(samePublishedBulletin(old, next), true);
-  next.charts.finalAction.EB2.India = '2013-12-01';
-  assert.equal(samePublishedBulletin(old, next), false);
+  const published = bulletinData.bulletins[0];
+  for (const cutoff of [published.charts.finalAction.EB2.India, 'C', 'U', '2013-12-01']) {
+    const old = structuredClone(published);
+    old.charts.finalAction.EB2.India = cutoff;
+    const next = structuredClone(old);
+    next.verifiedAt = old.verifiedAt === '2000-01-01' ? '2000-01-02' : '2000-01-01';
+    next.charts.finalAction.EB2 = Object.fromEntries(Object.entries(next.charts.finalAction.EB2).reverse());
+    assert.equal(samePublishedBulletin(old, next), true);
+    next.charts.finalAction.EB2.India = cutoff === 'C' ? 'U' : 'C';
+    assert.equal(samePublishedBulletin(old, next), false);
+  }
 });
