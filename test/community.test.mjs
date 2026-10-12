@@ -18,11 +18,12 @@ function database(t) {
     sqlite,
     prepare(sql) {
       const statement = sqlite.prepare(sql);
-      let parameters = [];
+      let parameters = {};
       return {
-        bind(...values) { parameters = values; return this; },
-        async run() { return { success: true, meta: { changes: Number(statement.run(...parameters).changes) } }; },
-        async all() { return { success: true, results: statement.all(...parameters) }; },
+        // Node 22.16 treats numbered placeholders as named, unlike later releases.
+        bind(...values) { parameters = Object.fromEntries(values.map((value, index) => [`?${index + 1}`, value])); return this; },
+        async run() { return { success: true, meta: { changes: Number(statement.run(parameters).changes) } }; },
+        async all() { return { success: true, results: statement.all(parameters) }; },
       };
     },
   };
