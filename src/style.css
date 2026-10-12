@@ -17,3 +17,6 @@
 @media(max-width:520px){.community-donut{grid-template-columns:1fr;gap:18px}.community-donut-chart{margin:0 auto}.community-charts h3{margin-bottom:20px}.community-legend>li{padding:9px 0}.community-legend-value{grid-template-columns:52px 48px}}
 @media(prefers-reduced-motion:no-preference){.community-donut-segment{transition:stroke-width .12s,filter .12s}}
 .community-donut-total-long{font-size:26px}
+.input-wrap input:not([type=range]):not([type=checkbox]){padding-left:37px}
+@media(max-width:420px){.profile-form{grid-template-columns:1fr}}
+@media(max-width:370px){.stat-row .metric-value{font-size:21px}}

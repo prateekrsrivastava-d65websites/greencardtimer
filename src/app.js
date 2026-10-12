@@ -35,6 +35,7 @@ let offerSalary = '', offerCompared = false;
 let processingData, processingDate = '', processingQueue = 'perm-analystReview';
 let employerQuery = '', employerState = '', employerSort = 'filings', employerPage = 1;
 let communityRequest, communityData, communityExpires = 0;
+let historyChartObserver;
 const recordCommunitySearch = createCommunityRecorder();
 let profile = { country: 'India', category: 'EB2', priorityDate: '2015-01-01', chart: 'finalAction', filingPath: 'aos' };
 const timelineProfiles = { employment: { ...profile }, family: { ...profile, category: 'F2A', priorityDate: '2024-01-01' } };
@@ -90,24 +91,46 @@ function profilePanel() {
   ${stored().length ? `<section class="saved-profiles"><h3>Saved on this device</h3>${stored().map((p, i) => `<div class="saved-row"><button type="button" class="saved-load" data-load-profile="${i}">${esc(countryLabel(p.country))} ${esc(categoryLabel(p.category))}<br><span class="muted">${formatDate(p.priorityDate)}</span></button>${button('trash-2', 'Remove saved profile', 'remove-profile', `data-profile="${i}"`)}</div>`).join('')}</section>` : ''}
   <p class="source-note">${sourceLink(bulletins.sourceUrl, 'U.S. Department of State')}<br>Verified ${formatDate(bulletins.generatedAt)}<br><a href="/methodology/">Sources & limitations</a></p>`;
 }
-function historyChart(points) {
+function historyChart(points, width = 720) {
   const selected = points.slice(-chartWindow - 1);
   const dated = selected.filter(p => parseDate(p.cutoff));
   if (!dated.length) return '<div class="empty-estimate">This period has no dated cutoffs. Current and Unavailable are shown in the history table below.</div>';
   const dateNumber = value => new Date(`${value}T00:00:00Z`).getTime();
   const pd = dateNumber(profile.priorityDate), values = [...dated.map(p => dateNumber(p.cutoff)), pd];
   let min = Math.min(...values), max = Math.max(...values); const padding = Math.max((max - min) * .13, 90 * 86400000); min -= padding; max += padding;
-  const svgWidth = Math.min(720, window.innerWidth <= 760 ? window.innerWidth - 40 : 720);
+  const svgWidth = Math.max(240, Math.min(720, Number(width) || 720));
   const left = 58, right = svgWidth - 12;
   const x = i => left + i / Math.max(1, selected.length - 1) * (right - left);
   const y = v => 175 - (v - min) / (max - min) * 147;
   let line = '', connected = false;
   selected.forEach((p, i) => { if (!parseDate(p.cutoff)) { connected = false; return; } line += `${connected ? 'L' : 'M'}${x(i).toFixed(1)},${y(dateNumber(p.cutoff)).toFixed(1)} `; connected = true; });
   const ticks = [0, 1, 2, 3].map(i => { const value = min + (max - min) * i / 3; const yy = y(value); return `<line class="gridline" x1="${left}" x2="${right}" y1="${yy}" y2="${yy}"/><text x="${left - 10}" y="${yy + 4}" text-anchor="end">${new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(value))}</text>`; }).join('');
-  const tickIndices = [...new Set([0, Math.floor((selected.length - 1) / 3), Math.floor((selected.length - 1) * 2 / 3), selected.length - 1])];
+  const tickCount = svgWidth < 340 ? 3 : 4;
+  const tickIndices = [...new Set(Array.from({ length: tickCount }, (_, i) => Math.floor((selected.length - 1) * i / (tickCount - 1))))];
   return `<div class="chart"><svg viewBox="0 0 ${svgWidth} 215" role="img" aria-label="${esc(categoryLabel(profile.category))} ${esc(countryLabel(profile.country))} cutoff history and your priority date"><title>Actual published cutoffs, ${esc(month(selected[0].month))} to ${esc(month(selected.at(-1).month))}</title>${ticks}<line class="priority-line" x1="${left}" x2="${right}" y1="${y(pd)}" y2="${y(pd)}"/><path class="line" d="${line}"/>${selected.map((p, i) => parseDate(p.cutoff) ? `<circle class="dot" cx="${x(i)}" cy="${y(dateNumber(p.cutoff))}" r="3.5"><title>${esc(month(p.month))}: ${formatDate(p.cutoff)}</title></circle>` : '').join('')}${tickIndices.map((i, index) => `<text x="${x(i)}" y="203" text-anchor="${index === tickIndices.length - 1 ? 'end' : 'middle'}">${esc(month(selected[i].month))}</text>`).join('')}</svg></div><div class="chart-legend"><span><span class="legend-key"></span>Published cutoff</span><span><span class="legend-key priority"></span>Your priority date</span></div>`;
 }
+function stopHistoryChartObserver() {
+  historyChartObserver?.disconnect();
+  historyChartObserver = null;
+}
+function observeHistoryChart(points) {
+  const chart = main.querySelector('.chart');
+  if (!chart) return;
+  let previousWidth;
+  const resize = width => {
+    const nextWidth = Math.round(Math.max(240, Math.min(720, width)));
+    if (nextWidth === previousWidth) return;
+    previousWidth = nextWidth;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = historyChart(points, nextWidth);
+    chart.replaceChildren(wrapper.querySelector('svg'));
+  };
+  resize(chart.getBoundingClientRect().width);
+  historyChartObserver = new ResizeObserver(entries => resize(entries[0].contentRect.width));
+  historyChartObserver.observe(chart);
+}
 function renderTimeline() {
+  stopHistoryChartObserver();
   timelineProfiles[categoryGroup(profile.category)] = { ...profile };
   const family = timelineRoute() === '/family-green-card/';
   const result = evaluateProfile(profile, bulletins, model);
@@ -124,6 +147,7 @@ function renderTimeline() {
   ${family ? `<section class="family-scope"><h2>Family preference categories</h2><dl>${routeCategories().map(c => `<div><dt>${esc(c.label)}</dt><dd>${esc(c.description || '')}</dd></div>`).join('')}</dl><p class="chart-caption">Immediate relatives of U.S. citizens are not covered by these preference cutoffs. Age-out rules, category changes and individual eligibility are not calculated here. Published cutoffs do not predict your approval date.</p></section>` : `<section class="scenario-band"><div class="section-heading" style="margin-top:0"><h2>Illustrative cutoff scenarios</h2></div>${result.scenarios ? `<div class="scenario-grid">${result.scenarios.map(s => `<div class="scenario ${s.id === 'typical' ? 'base' : ''}"><div class="scenario-label">${icon('trending-up')}${esc(s.label.replace(' historical', ''))}</div><div class="scenario-date">${s.date ? month(s.date) : s.beyondHorizon ? 'Beyond 10 years' : 'No positive pace'}</div><p class="scenario-detail">${s.months && !s.beyondHorizon ? `${s.months} calendar months` : esc(s.reason)}</p></div>`).join('')}</div>` : `<div class="empty-estimate">${esc(result.forecastReason)}</div>`}<p class="chart-caption">${result.scenarios ? esc(result.forecastReason) : 'There is no reliable individual approval date in the public cutoff data.'}</p><a class="method-link" href="/methodology/">How these scenarios work ${icon('arrow-up-right')}</a></section>`}${adSpace(family ? 'family-between-sections' : 'timeline-between-sections')}
   <details class="details"><summary>Recent published cutoffs</summary><div class="table-wrap history-table"><table><thead><tr><th>Bulletin</th><th>Cutoff</th><th>Movement</th></tr></thead><tbody>${result.trend.points.slice(-12).reverse().map(p => { const previous = result.trend.points.find((q, i, all) => all[i + 1]?.month === p.month); return `<tr><td>${sourceLink(p.sourceUrl, month(p.month))}</td><td class="table-date">${formatDate(p.cutoff)}</td><td>${previous ? movement(previous.cutoff, p.cutoff) : '\u2014'}</td></tr>`; }).join('')}</tbody></table></div></details></section></div>${family ? '' : homeCommunity()}`;
   finishRender();
+  observeHistoryChart(result.trend.points);
   if (!family) void loadCommunitySection();
 }
 function renderBulletin() {
@@ -319,6 +343,7 @@ function renderOffer() {
   document.querySelector('#offer-result').innerHTML = result.count ? `<div class="benchmark-result"><strong>${result.percentile}%</strong><span>of filed wages below this offer<br>(ties count half)</span></div><p class="chart-caption">${result.smallSample ? 'Small sample: fewer than 10 filings. ' : ''}Median ${money(result.median)} / ${number(result.count)} comparable filings.</p>` : '<p class="chart-caption">No matching wages to compare.</p>';
 }
 function renderRoute() {
+  stopHistoryChartObserver();
   careerToken += 1;
   const route = path();
   if (timelinePath()) { timelineProfiles[categoryGroup(profile.category)] = { ...profile }; profile = { ...timelineProfiles[route === '/family-green-card/' ? 'family' : 'employment'] }; renderTimeline(); } else if (route === '/visa-bulletin/') renderBulletin(); else if (route === '/salary-data/') renderCareer(); else if (route === '/employers/') renderEmployerDirectory(); else if (route.startsWith('/employers/')) renderEmployerProfile(); else if (route === '/processing-times/') renderProcessing(); else if (route === '/community/') renderCommunity(); else if (route === '/methodology/') { renderSources(); appendWageScope(); main.querySelector('.reading').insertAdjacentHTML('beforeend','<h2>PERM and prevailing wages</h2><p>Official DOL processing months and average review durations are weekly-checked snapshots, not a live case lookup or remaining-wait forecast. PWD request counts are prevailing-wage requests, not pending labor certifications. Employer profiles summarize the same certified H-1B disclosure release used by salary search. Certification is not visa approval or proof of green-card sponsorship.</p><p><a href="https://flag.dol.gov/processingtimes" target="_blank" rel="noopener noreferrer">Official DOL processing times</a>. Community counts are aggregated submitted checks, not government data; see <a href="/privacy/">privacy and aggregation rules</a>.</p>'); } else if (route === '/privacy/') renderPrivacy(); else { main.innerHTML = '<div class="page-heading"><div><h1>Page not found</h1><p><a href="/">Return to the priority date calculator</a></p></div></div>'; finishRender(); }
@@ -382,19 +407,6 @@ document.addEventListener('keydown', event => {
 });
 document.addEventListener('click', event => { const menu = document.querySelector('#employer-options'); if (menu && !event.target.closest('.employer-search')) { menu.hidden = true; document.querySelector('#employer-search')?.setAttribute('aria-expanded', 'false'); } });
 window.addEventListener('popstate', renderRoute);
-let chartResizeFrame, previousWidth = window.innerWidth;
-window.addEventListener('resize', () => {
-  if (window.innerWidth === previousWidth) return;
-  previousWidth = window.innerWidth;
-  cancelAnimationFrame(chartResizeFrame);
-  chartResizeFrame = requestAnimationFrame(() => {
-    const previousChart = document.querySelector('.chart');
-    if (!timelinePath() || !previousChart || !bulletins) return;
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = historyChart(evaluateProfile(profile, bulletins, model).trend.points);
-    previousChart.replaceWith(wrapper.firstElementChild);
-  });
-});
 async function boot() {
   finishRender();
   try {
