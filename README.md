@@ -23,7 +23,7 @@ Push this directory as the repository root. Connect the repository through [Clou
 - Production branch: `main`
 - Build image: v3, with `NODE_VERSION=22.16.0` and `PYTHON_VERSION=3.13.3`
 - Set `SITE_URL` to the final HTTPS origin, such as your actual custom domain, to enable canonical links, `robots.txt`, and `sitemap.xml`. Without it, none of those domain-specific files or tags are generated.
-- The Google Search Console URL-prefix property uses `public/googlee76d3b44d7907009.html` for ownership verification. Keep this public verification file in every deployment; no analytics script, subscription, or scheduled submission is needed. The sitemap stays at `/sitemap.xml` and is regenerated on each build.
+- Google Search Console uses the D65 account's `google-site-verification` meta tag in `index.html`. Keep this tag in every deployment, and do not restore personal-account verification files. No analytics script, subscription, or scheduled submission is needed. The sitemap stays at `/sitemap.xml` and is regenerated on each build.
 
 The [current build image includes Python](https://developers.cloudflare.com/pages/configuration/build-image/). Attach the custom domain through the Cloudflare dashboard after the first successful deployment. Government tools remain static and bypass Functions. Only `/api/community` invokes a Function with the `COMMUNITY_DB` D1 binding. No KV, R2, paid API or GitHub deployment secret is needed. Free-tier limits still apply; a domain registration is separate.
 

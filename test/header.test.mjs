@@ -1,10 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { load } from 'cheerio';
+import { ROUTES, routeHTML } from '../scripts/postbuild.mjs';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const css = await readFile(new URL('../src/style.css', import.meta.url), 'utf8');
+
+test('D65 ownership metadata survives prerendering without obsolete verification files', async () => {
+  const $ = load(html);
+  const token = $('head meta[name="google-site-verification"]').attr('content');
+  assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+  const rendered = load(routeHTML(html, ROUTES[0], 'https://greencardtimer.pages.dev'));
+  assert.equal(rendered('head meta[name="google-site-verification"]').length, 1);
+  assert.equal(rendered('head meta[name="google-site-verification"]').attr('content'), token);
+  assert.equal((await readdir(new URL('../public/', import.meta.url))).filter(name => /^google[0-9a-f]+\.html$/.test(name)).length, 0);
+});
 
 test('header places the free access promise beneath the linked brand without duplicate labels', () => {
   const $ = load(html);
