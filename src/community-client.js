@@ -1,34 +1,22 @@
 import { buildSearchContribution } from './community.js';
 
-export function createCommunityRecorder({ fetchImpl = fetch, privacySignal = () => false } = {}) {
-  const contributions = new Set();
-
+export function createCommunityRecorder({ fetchImpl = fetch } = {}) {
   return async function record(profile) {
-    let key;
-    let reserved = false;
-    let accepted = false;
     try {
-      if (privacySignal()) return false;
       const contribution = buildSearchContribution(profile);
-      if (!contribution) return false;
-      key = JSON.stringify(contribution);
-      if (contributions.has(key) || contributions.size >= 10) return false;
-      // Reserve before fetching so overlapping searches cannot double count.
-      contributions.add(key);
-      reserved = true;
+      if (!contribution) return null;
       const response = await fetchImpl('/api/community', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: key,
+        body: JSON.stringify(contribution),
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
       });
-      accepted = Boolean(response.ok && (await response.json()).accepted === true);
-      return accepted;
+      if (!response.ok) return null;
+      const result = await response.json();
+      return result?.accepted === true ? result : null;
     } catch {
-      return false;
-    } finally {
-      if (reserved && !accepted) contributions.delete(key);
+      return null;
     }
   };
 }

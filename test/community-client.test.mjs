@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createCommunityRecorder } from '../src/community-client.js';
 
 const profile = { country: 'India', category: 'EB2', priorityDate: '2017-04-21' };
-const acceptedResponse = () => ({ ok: true, async json() { return { accepted: true }; } });
+const acceptedResponse = (value = { accepted: true }) => ({ ok: true, async json() { return value; } });
 
 function pendingResponse() {
   let resolve;
@@ -20,7 +20,7 @@ test('creating a recorder does not record page views or send network requests', 
 test('a submitted valid search sends only the three coarse fields without cookies or referrer', async () => {
   const requests = [];
   const record = createCommunityRecorder({ fetchImpl: async (...args) => { requests.push(args); return acceptedResponse(); } });
-  assert.equal(await record({ ...profile, chart: 'filing', id: 'private-id', name: 'Private name', query: 'unrestricted text' }), true);
+  assert.deepEqual(await record({ ...profile, chart: 'filing', id: 'private-id', name: 'Private name', query: 'unrestricted text' }), { accepted: true });
   assert.deepEqual(requests, [['/api/community', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -30,122 +30,90 @@ test('a submitted valid search sends only the three coarse fields without cookie
   }]]);
 });
 
+test('accepted response objects include the fresh server summary when available', async () => {
+  const result = { accepted: true, summary: { status: 'ready', total: 3, countries: [{ label: 'India', count: 3 }] } };
+  const record = createCommunityRecorder({ fetchImpl: async () => acceptedResponse(result) });
+  assert.equal(await record(profile), result);
+});
+
+test('accepted submissions without a summary are still reported as successful', async () => {
+  const result = { accepted: true };
+  const record = createCommunityRecorder({ fetchImpl: async () => acceptedResponse(result) });
+  assert.equal(await record(profile), result);
+});
+
 test('malformed dates, missing fields and unrecognized categories or countries never submit', async () => {
   let requests = 0;
   const record = createCommunityRecorder({ fetchImpl: async () => { requests++; return acceptedResponse(); } });
   for (const invalid of [null, {}, { ...profile, priorityDate: '2025-02-29' }, { ...profile, priorityDate: '04-21-2017' }, { ...profile, priorityDate: 2017 }, { ...profile, country: 'Unknown' }, { ...profile, category: 'F5' }]) {
-    assert.equal(await record(invalid), false);
+    assert.equal(await record(invalid), null);
   }
   assert.equal(requests, 0);
 });
 
-test('enabled privacy signals prevent submissions without reserving the search', async () => {
-  let blocked = true;
-  let requests = 0;
-  const record = createCommunityRecorder({ privacySignal: () => blocked, fetchImpl: async () => { requests++; return acceptedResponse(); } });
-  assert.equal(await record(profile), false);
-  assert.equal(requests, 0);
-  blocked = false;
-  assert.equal(await record(profile), true);
-  assert.equal(requests, 1);
+test('repeated identical profiles and matching coarse buckets each send a new contribution', async () => {
+  const bodies = [];
+  const record = createCommunityRecorder({ fetchImpl: async (_, options) => { bodies.push(options.body); return acceptedResponse(); } });
+  assert.deepEqual(await record(profile), { accepted: true });
+  assert.deepEqual(await record(profile), { accepted: true });
+  assert.deepEqual(await record({ ...profile, priorityDate: '2019-12-31' }), { accepted: true });
+  assert.equal(bodies.length, 3);
+  assert.equal(new Set(bodies).size, 1);
 });
 
-test('privacy preferences are checked dynamically for each submitted search', async () => {
-  let blocked = false;
-  let requests = 0;
-  const record = createCommunityRecorder({ privacySignal: () => blocked, fetchImpl: async () => { requests++; return acceptedResponse(); } });
-  assert.equal(await record(profile), true);
-  blocked = true;
-  const other = { ...profile, category: 'F2A' };
-  assert.equal(await record(other), false);
-  assert.equal(requests, 1);
-  blocked = false;
-  assert.equal(await record(other), true);
-  assert.equal(requests, 2);
-});
-
-test('concurrent identical buckets reserve once, including different exact dates in the same period', async () => {
-  const pending = pendingResponse();
-  let requests = 0;
-  const record = createCommunityRecorder({ fetchImpl: () => { requests++; return pending.promise; } });
-  const first = record(profile);
-  assert.equal(await record({ ...profile, priorityDate: '2019-12-31' }), false);
-  assert.equal(requests, 1);
-  pending.resolve(acceptedResponse());
-  assert.equal(await first, true);
-  assert.equal(await record(profile), false);
-  assert.equal(requests, 1);
-});
-
-test('each tab recorder has its own deduplication without a persistent visitor identifier', async () => {
-  let requests = 0;
-  const options = { fetchImpl: async () => { requests++; return acceptedResponse(); } };
-  const first = createCommunityRecorder(options);
-  const second = createCommunityRecorder(options);
-  assert.equal(await first(profile), true);
-  assert.equal(await first(profile), false);
-  assert.equal(await second(profile), true);
-  assert.equal(requests, 2);
-});
-
-test('at most ten accepted contributions are submitted in a tab', async () => {
+test('more than ten submitted checks are independently counted without a per-tab cap', async () => {
   let requests = 0;
   const record = createCommunityRecorder({ fetchImpl: async () => { requests++; return acceptedResponse(); } });
-  const categories = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
-  for (const category of categories) assert.equal(await record({ ...profile, category }), true);
-  assert.equal(await record({ ...profile, country: 'China' }), false);
-  assert.equal(requests, 10);
+  for (let index = 0; index < 25; index++) assert.deepEqual(await record(profile), { accepted: true });
+  assert.equal(requests, 25);
 });
 
-test('the ten-contribution cap includes pending requests before any have completed', async () => {
+test('concurrent identical checks each send independently before earlier requests finish', async () => {
   const pending = pendingResponse();
   let requests = 0;
   const record = createCommunityRecorder({ fetchImpl: () => { requests++; return pending.promise; } });
-  const categories = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
-  const requestsPending = categories.map(category => record({ ...profile, category }));
-  assert.equal(await record({ ...profile, country: 'China' }), false);
-  assert.equal(requests, 10);
+  const checks = Array.from({ length: 12 }, () => record(profile));
+  assert.equal(requests, 12);
   pending.resolve(acceptedResponse());
-  assert.deepEqual(await Promise.all(requestsPending), Array(10).fill(true));
+  assert.deepEqual(await Promise.all(checks), Array.from({ length: 12 }, () => ({ accepted: true })));
 });
 
-test('failed HTTP responses and rejected contributions quietly allow a later retry', async () => {
-  for (const response of [{ ok: false }, { ok: true, async json() { return { accepted: false }; } }, { ok: true, async json() { return { accepted: 'true' }; } }]) {
+test('HTTP failures and rejected or malformed acceptance values quietly return null', async () => {
+  for (const response of [
+    { ok: false },
+    acceptedResponse({ accepted: false }),
+    acceptedResponse({ accepted: 'true' }),
+    acceptedResponse({ accepted: 1 }),
+    acceptedResponse({}),
+    acceptedResponse(null),
+    acceptedResponse([]),
+  ]) {
     let requests = 0;
     const record = createCommunityRecorder({ fetchImpl: async () => ++requests === 1 ? response : acceptedResponse() });
-    assert.equal(await record(profile), false);
-    assert.equal(await record(profile), true);
-    assert.equal(await record(profile), false);
+    assert.equal(await record(profile), null);
+    assert.deepEqual(await record(profile), { accepted: true });
     assert.equal(requests, 2);
   }
 });
 
-test('network and JSON exceptions release the reservation and never escape', async () => {
-  for (const failure of [() => { throw new Error('Offline'); }, () => ({ ok: true, json() { throw new Error('Malformed response'); } })]) {
+test('network and JSON exceptions never escape or prevent later submissions', async () => {
+  for (const failure of [
+    () => { throw new Error('Offline'); },
+    () => ({ ok: true, json() { throw new Error('Malformed response'); } }),
+    () => ({ ok: true, async json() { throw new Error('Failed body download'); } }),
+  ]) {
     let requests = 0;
     const record = createCommunityRecorder({ fetchImpl: async () => ++requests === 1 ? failure() : acceptedResponse() });
-    assert.equal(await record(profile), false);
-    assert.equal(await record(profile), true);
+    assert.equal(await record(profile), null);
+    assert.deepEqual(await record(profile), { accepted: true });
     assert.equal(requests, 2);
   }
 });
 
-test('failed requests release capacity for other coarse searches', async () => {
-  const pending = pendingResponse();
+test('a malformed profile property fails quietly without sending a request', async () => {
   let requests = 0;
-  const record = createCommunityRecorder({ fetchImpl: async () => { requests++; return requests <= 10 ? pending.promise : acceptedResponse(); } });
-  const categories = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
-  const requestsPending = categories.map(category => record({ ...profile, category }));
-  assert.equal(await record({ ...profile, country: 'China' }), false);
-  pending.resolve({ ok: false });
-  assert.deepEqual(await Promise.all(requestsPending), Array(10).fill(false));
-  assert.equal(await record({ ...profile, country: 'China' }), true);
-  assert.equal(requests, 11);
-});
-
-test('privacy signal errors fail closed without sending a request', async () => {
-  let requests = 0;
-  const record = createCommunityRecorder({ privacySignal() { throw new Error('Unavailable privacy preferences'); }, fetchImpl: async () => { requests++; return acceptedResponse(); } });
-  assert.equal(await record(profile), false);
+  const record = createCommunityRecorder({ fetchImpl: async () => { requests++; return acceptedResponse(); } });
+  const malformed = { get priorityDate() { throw new Error('Invalid profile'); } };
+  assert.equal(await record(malformed), null);
   assert.equal(requests, 0);
 });

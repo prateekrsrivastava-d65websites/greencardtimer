@@ -24,23 +24,26 @@ test('processing route publishes sourced queue and prevailing wage tables withou
   assert.equal($('a').first().attr('href'),'https://flag.dol.gov/processingtimes');
 });
 
-test('community and privacy static pages disclose automatic coarse aggregation without fabricated counts', () => {
+test('community and privacy static pages disclose automatic exact search counts without fabricated data', () => {
   const community = load(initialContent(ROUTES.find(r=>r.path==='/community/')));
   const privacy = load(initialContent(ROUTES.find(r=>r.path==='/privacy/')));
   for (const text of [community.text(),privacy.text()]) {
     assert.match(text,/automatically/);
-    assert.doesNotMatch(text,/unchecked|Optional community|explicit contributed check/);
-    assert.match(text,/100 contributions/);
-    assert.match(text,/groups below 20/);
-    assert.match(text,/five-year date range/);
+    assert.doesNotMatch(text,/unchecked|Optional community|explicit contributed check|100 contributions|groups below 20|completed UTC days|round counts down|Do Not Track|Global Privacy Control/);
+    assert.match(text,/last 30 UTC calendar days, including today/);
+    assert.match(text,/exact counts from the first search/);
+    assert.match(text,/five-year bands, plus before 2000 and 2030 or later/);
+    assert.match(text,/no opt-in, per-tab limit, duplicate filtering or browser-signal exclusion/);
+    assert.match(text,/repeat submissions/i);
+    assert.match(text,/up to one minute/);
   }
   assert.equal(community('table').length,0);
   assert.match(privacy.text(),/inactive rollups may remain longer/);
-  assert.match(privacy.text(),/Global Privacy Control/);
-  assert.match(privacy.text(),/Exact dates stay in your browser/);
-  assert.match(privacy.text(),/platform logs are separate from the aggregate counters/);
-  assert.match(privacy.text(),/Browsing, typing, saved-profile loading, saving and chart changes do not contribute/);
-  assert.match(privacy.text(),/limit of 10 contributions per tab/);
+  assert.match(privacy.text(),/does not store exact dates, raw submissions, combinations/);
+  assert.match(privacy.text(),/platform logs are separate from the search counters/);
+  assert.match(privacy.text(),/Browsing, typing, loading or saving profiles, chart changes, employer searches and PERM dates are not recorded/);
+  assert.match(privacy.text(),/10,000-search daily cap/);
+  assert.match(privacy.text(),/Last updated: October 11, 2026/);
   for (const path of ['/privacy/', '/community/']) {
     assert.doesNotMatch(ROUTES.find(route => route.path === path).description,/optional/i);
   }
@@ -56,16 +59,20 @@ test('home initial HTML includes community trends without fabricated live charts
   assert.equal(section.find('table, canvas, svg').length,0);
   assert.match(section.text(),/no live counts are embedded/);
   assert.match(section.text(),/counted automatically/);
-  assert.match(section.text(),/100 contributions/);
-  assert.match(section.text(),/groups below 20/);
-  assert.doesNotMatch(section.text(),/unchecked|optional|\d[\d,.]*%|collecting \d/i);
+  assert.match(section.text(),/last 30 UTC calendar days, including today/);
+  assert.match(section.text(),/exact counts from the first search/);
+  assert.match(section.text(),/including repeat submissions/);
+  assert.doesNotMatch(section.text(),/unchecked|optional|\d[\d,.]*%|collecting \d|100 contributions|groups below 20|completed UTC days/i);
 });
 
 test('methodology identifies automatic submitted checks and excludes background activity', () => {
   const $ = load(initialContent(ROUTES.find(route => route.path === '/methodology/')));
-  assert.match($.text(),/Valid submitted priority-date checks automatically add/);
-  assert.match($.text(),/saved-profile loading and chart changes do not submit a contribution/);
+  assert.match($.text(),/Valid submitted employment and family priority-date checks automatically add/);
+  assert.match($.text(),/saved-profile loading and chart changes do not submit a search/);
   assert.match($.text(),/separate marginal distributions, not combinations/);
+  assert.match($.text(),/Repeat submissions count again/);
+  assert.match($.text(),/exact counts from the first search/);
+  assert.doesNotMatch($.text(),/100 contributions|groups below 20|Do Not Track|Global Privacy Control|completed UTC days/);
   assert.equal($('a[href="/privacy/"]').length,1);
 });
 const employer = { id: 'abcdef0123456789', name: 'EXAMPLE & SONS <script>bad</script>', filings: 2, median: 150000 };

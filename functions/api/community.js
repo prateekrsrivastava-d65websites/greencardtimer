@@ -51,11 +51,18 @@ async function readSmallJSON(request) {
   }
 }
 
+async function readSummary(context, now) {
+  const window = communityWindow(now);
+  const result = await context.env.COMMUNITY_DB.prepare(SELECT_ROLLUPS_SQL).bind(window.from, window.through).all();
+  if (!result.success || !Array.isArray(result.results)) throw new Error('Aggregate unavailable');
+  return buildCommunitySummary(result.results, now);
+}
+
 async function publicSummary(context, url, now) {
   const window = communityWindow(now);
   const cache = globalThis.caches?.default;
   const cacheURL = new URL(url);
-  cacheURL.search = `?snapshot=${window.through}`;
+  cacheURL.search = `?schema=2&snapshot=${window.through}`;
   const cacheKey = new Request(cacheURL, { method: 'GET' });
   if (cache) {
     try {
@@ -63,9 +70,7 @@ async function publicSummary(context, url, now) {
       if (hit) return hit;
     } catch { /* Cache availability must not determine API availability. */ }
   }
-  const result = await context.env.COMMUNITY_DB.prepare(SELECT_ROLLUPS_SQL).bind(window.from, window.through).all();
-  if (!result.success || !Array.isArray(result.results)) throw new Error('Aggregate unavailable');
-  const response = json(buildCommunitySummary(result.results, now), 200, 'public, max-age=3600');
+  const response = json(await readSummary(context, now), 200, 'public, max-age=60');
   if (cache && typeof context.waitUntil === 'function') {
     try { context.waitUntil(cache.put(cacheKey, response.clone()).catch(() => {})); } catch { /* Optional edge caching must remain best effort. */ }
   }
@@ -86,15 +91,23 @@ export async function onRequest(context) {
     if (!context.env?.COMMUNITY_DB) return json({ error: 'Community summary temporarily unavailable.' }, 503);
     const now = new Date();
     const day = now.toISOString().slice(0, 10);
+    let accepted;
     try {
       const result = await context.env.COMMUNITY_DB.prepare(INSERT_CONTRIBUTION_SQL).bind(
         day, contribution.country, contribution.category, contribution.priorityPeriod,
         `$.countries.${contribution.country}`, `$.categories.${contribution.category}`, `$.priorityPeriods."${contribution.priorityPeriod}"`,
       ).run();
       if (!result.success) throw new Error('Aggregate unavailable');
-      return json({ accepted: result.meta?.changes > 0 }, 202);
+      accepted = result.meta?.changes > 0;
     } catch {
       return json({ error: 'Community summary temporarily unavailable.' }, 503);
+    }
+    if (!accepted) return json({ accepted: false }, 202);
+    try {
+      return json({ accepted: true, summary: await readSummary(context, now) }, 202);
+    } catch {
+      // A read failure after a committed write must not imply the search was lost.
+      return json({ accepted: true }, 202);
     }
   }
   if (!context.env?.COMMUNITY_DB) return json({ error: 'Community summary temporarily unavailable.' }, 503);

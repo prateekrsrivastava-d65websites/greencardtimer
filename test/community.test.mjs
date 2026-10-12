@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
-import { buildCommunitySummary, buildSearchContribution, communityWindow, validContribution } from '../src/community.js';
-import { INSERT_CONTRIBUTION_SQL, onRequest } from '../functions/api/community.js';
+import { buildCommunitySummary, buildSearchContribution, communityWindow, validCommunitySummary, validContribution } from '../src/community.js';
+import { INSERT_CONTRIBUTION_SQL, SELECT_ROLLUPS_SQL, onRequest } from '../functions/api/community.js';
 
 const migration = await readFile(new URL('../migrations/0001-community.sql', import.meta.url), 'utf8');
 const origin = 'https://greencardtimer.pages.dev';
@@ -73,34 +73,58 @@ test('the server rejects exact dates, identifiers, unrecognized bins and extra f
   for (const value of [null, [], 'India', {}, { ...sample, priorityDate: '2015-01-01' }, { ...sample, ip: '127.0.0.1' }, { ...sample, country: 'US' }, { ...sample, category: 'H1B' }, { ...sample, priorityPeriod: '2015-01-01' }, { ...sample, priorityPeriod: 2015 }]) assert.equal(validContribution(value), false);
 });
 
-test('the public window is exactly thirty completed UTC days including across year boundaries', () => {
-  assert.deepEqual(communityWindow('2026-01-01T23:59:59Z'), { from: '2025-12-02', through: '2025-12-31', days: 30 });
-  assert.deepEqual(communityWindow('2026-01-02T00:00:00Z'), { from: '2025-12-03', through: '2026-01-01', days: 30 });
+test('the public window is thirty UTC calendar days including today across year boundaries', () => {
+  assert.deepEqual(communityWindow('2026-01-01T23:59:59Z'), { from: '2025-12-03', through: '2026-01-01', days: 30 });
+  assert.deepEqual(communityWindow('2026-01-02T00:00:00Z'), { from: '2025-12-04', through: '2026-01-02', days: 30 });
 });
 
-test('small samples publish no exact totals or partial histograms', () => {
-  const summary = buildCommunitySummary([row('2026-01-01', [[sample, 99]])], '2026-01-02T12:00:00Z');
-  assert.deepEqual(summary, { status: 'collecting', window: { from: '2025-12-03', through: '2026-01-01', days: 30 }, totalRange: null, countries: [], categories: [], priorityPeriods: [] });
-  assert.equal(JSON.stringify(summary).includes('99'), false);
+test('an empty database publishes a truthful zero total with no invented bins', () => {
+  const summary = buildCommunitySummary([], '2026-01-02T12:00:00Z');
+  assert.deepEqual(summary, { status: 'empty', window: { from: '2025-12-04', through: '2026-01-02', days: 30 }, total: 0, countries: [], categories: [], priorityPeriods: [] });
+  assert.deepEqual(buildCommunitySummary([row('2026-01-02', [])], '2026-01-02T12:00:00Z'), summary);
 });
 
-test('public histograms suppress bins below twenty, round down to ten, and publish a broad total range', () => {
+test('public histograms publish exact totals and every positive bin including one, nineteen and twenty-one', () => {
   const summary = buildCommunitySummary([row('2026-01-01', [
-    [sample, 61], [{ country: 'China', category: 'F1', priorityPeriod: '2000-2004' }, 20], [{ country: 'Mexico', category: 'F4', priorityPeriod: 'before2000' }, 19],
+    [sample, 1], [{ country: 'China', category: 'F1', priorityPeriod: '2000-2004' }, 19], [{ country: 'Mexico', category: 'F4', priorityPeriod: 'before2000' }, 21],
   ])], '2026-01-02T12:00:00Z');
   assert.equal(summary.status, 'ready');
-  assert.equal(summary.totalRange, '100-199');
-  assert.deepEqual(summary.countries, [{ id: 'India', label: 'India', count: 60 }, { id: 'China', label: 'China', count: 20 }]);
-  assert.deepEqual(summary.categories, [{ id: 'EB2', label: 'EB2', count: 60 }, { id: 'F1', label: 'F1', count: 20 }]);
-  assert.deepEqual(summary.priorityPeriods, [{ id: '2000-2004', label: '2000-2004', count: 20 }, { id: '2015-2019', label: '2015-2019', count: 60 }]);
-  assert.deepEqual(Object.keys(summary).sort(), ['categories', 'countries', 'priorityPeriods', 'status', 'totalRange', 'window']);
+  assert.equal(summary.total, 41);
+  assert.deepEqual(summary.countries, [{ id: 'India', label: 'India', count: 1 }, { id: 'China', label: 'China', count: 19 }, { id: 'Mexico', label: 'Mexico', count: 21 }]);
+  assert.deepEqual(summary.categories, [{ id: 'EB2', label: 'EB2', count: 1 }, { id: 'F1', label: 'F1', count: 19 }, { id: 'F4', label: 'F4', count: 21 }]);
+  assert.deepEqual(summary.priorityPeriods, [{ id: 'before2000', label: 'Before 2000', count: 21 }, { id: '2000-2004', label: '2000-2004', count: 19 }, { id: '2015-2019', label: '2015-2019', count: 1 }]);
+  assert.deepEqual(Object.keys(summary).sort(), ['categories', 'countries', 'priorityPeriods', 'status', 'total', 'window']);
+  assert.equal(validCommunitySummary(summary), true);
 });
 
-test('today and out-of-window rollups cannot change the completed-day summary', () => {
-  const completed = row('2026-01-01', [[sample, 100]]);
-  const before = buildCommunitySummary([completed], '2026-01-02T00:00:01Z');
-  const after = buildCommunitySummary([completed, row('2026-01-02', [[sample, 1000]]), row('2025-12-02', [[sample, 1000]])], '2026-01-02T23:59:59Z');
-  assert.deepEqual(after, before);
+test('public summary validation accepts exact current and empty schemas but rejects old cached versions', () => {
+  const empty = buildCommunitySummary([], '2026-01-02T12:00:00Z');
+  const ready = buildCommunitySummary([row('2026-01-02', [[sample, 1]])], '2026-01-02T12:00:00Z');
+  assert.equal(validCommunitySummary(empty), true);
+  assert.equal(validCommunitySummary(ready), true);
+  const atCapacity = { ...ready, total: 300000, countries: [{ ...ready.countries[0], count: 300000 }], categories: [{ ...ready.categories[0], count: 300000 }], priorityPeriods: [{ ...ready.priorityPeriods[0], count: 300000 }] };
+  assert.equal(validCommunitySummary(atCapacity), true);
+  for (const value of [null, [], {}, { ...empty, status: 'collecting', totalRange: null }, { ...ready, totalRange: '100-199' }, { ...ready, status: 'empty' }, { ...empty, status: 'ready' }, { ...ready, total: 1.5 }, { ...empty, total: -1 }, { ...atCapacity, total: 300001 }]) assert.equal(validCommunitySummary(value), false);
+});
+
+test('public summary validation requires thirty real calendar days and matching unique canonical bins', () => {
+  const ready = buildCommunitySummary([row('2026-01-02', [[sample, 21]])], '2026-01-02T12:00:00Z');
+  for (const window of [null, [], { ...ready.window, days: 29 }, { ...ready.window, from: '2025-12-03' }, { ...ready.window, through: '2026-02-30' }, { ...ready.window, extra: true }]) assert.equal(validCommunitySummary({ ...ready, window }), false);
+  for (const [dimension, invalid] of [
+    ['countries', null], ['countries', []], ['countries', [...ready.countries, ready.countries[0]]], ['countries', [{ id: 'Unknown', label: 'Unknown', count: 21 }]],
+    ['countries', [{ ...ready.countries[0], label: 'China' }]], ['categories', [{ ...ready.categories[0], count: 20 }]], ['categories', [{ ...ready.categories[0], count: 0 }]],
+    ['categories', [{ ...ready.categories[0], count: 21.5 }]], ['priorityPeriods', [{ ...ready.priorityPeriods[0], priorityDate: '2015-01-01' }]],
+  ]) assert.equal(validCommunitySummary({ ...ready, [dimension]: invalid }), false);
+});
+
+test('today changes the summary immediately, while older and future days are excluded', () => {
+  const earlier = row('2025-12-04', [[sample, 1]]);
+  const before = buildCommunitySummary([earlier], '2026-01-02T00:00:01Z');
+  const after = buildCommunitySummary([earlier, row('2026-01-02', [[sample, 19]]), row('2025-12-03', [[sample, 1000]]), row('2026-01-03', [[sample, 1000]])], '2026-01-02T23:59:59Z');
+  assert.equal(before.total, 1);
+  assert.equal(after.total, 20);
+  assert.deepEqual(after.countries, [{ id: 'India', label: 'India', count: 20 }]);
+  assert.deepEqual(after.window, before.window);
 });
 
 test('corrupt or inconsistent rollups fail closed rather than publishing invented statistics', () => {
@@ -147,12 +171,39 @@ test('POST accepts same-origin coarse data without recording headers or exact da
   const response = await onRequest(context(db, { method: 'POST', body: sample, headers: { 'User-Agent': 'not retained', 'CF-Connecting-IP': '192.0.2.10', 'Content-Type': 'application/json; charset=utf-8' } }));
   assert.equal(response.status, 202);
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
-  assert.deepEqual(await response.json(), { accepted: true });
+  const result = await response.json();
+  assert.equal(result.accepted, true);
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.summary.status, 'ready');
+  assert.deepEqual(result.summary.countries, [{ id: 'India', label: 'India', count: 1 }]);
   const stored = db.sqlite.prepare('SELECT * FROM community_daily').get();
   assert.equal(stored.day, today());
   assert.equal(stored.total, 1);
   assert.equal(JSON.stringify(stored).includes('192.0.2.10'), false);
   assert.equal(JSON.stringify(stored).includes('not retained'), false);
+});
+
+test('each successful POST returns the fresh current-day summary without another request', async t => {
+  const db = database(t);
+  for (let count = 1; count <= 3; count += 1) {
+    const response = await onRequest(context(db, { method: 'POST', body: sample }));
+    assert.equal(response.status, 202);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    const result = await response.json();
+    assert.equal(result.accepted, true);
+    assert.equal(result.summary.total, count);
+    assert.deepEqual(result.summary.priorityPeriods, [{ id: '2015-2019', label: '2015-2019', count }]);
+  }
+  assert.equal(db.sqlite.prepare('SELECT total FROM community_daily WHERE day = ?').get(today()).total, 3);
+});
+
+test('a summary read failure after a successful write still reports the recorded search as accepted', async t => {
+  const db = database(t);
+  const writeOnly = { prepare(sql) { if (sql === SELECT_ROLLUPS_SQL) throw new Error('summary unavailable'); return db.prepare(sql); } };
+  const response = await onRequest(context(writeOnly, { method: 'POST', body: sample }));
+  assert.equal(response.status, 202);
+  assert.deepEqual(await response.json(), { accepted: true });
+  assert.equal(db.sqlite.prepare('SELECT total FROM community_daily WHERE day = ?').get(today()).total, 1);
 });
 
 test('cross-origin posts and unsupported methods never touch storage', async () => {
@@ -180,23 +231,51 @@ test('streamed bodies are bounded independently of a claimed content length', as
   assert.equal((await onRequest(context(null, { method: 'POST', body: sample, headers: { 'Content-Length': '513' } }))).status, 400);
 });
 
-test('GET only reads completed-day aggregate rows, is public-cacheable, and does not track views', async t => {
+test('GET reads current-day totals, caches for one minute, and does not count page views', async t => {
   const db = database(t);
   const window = communityWindow();
-  const completed = row(window.through, [[sample, 100]]);
-  db.sqlite.prepare('INSERT INTO community_daily(day,total,counters) VALUES (?,?,?)').run(completed.day, completed.total, completed.counters);
+  const earlier = row(window.from, [[sample, 19]]);
+  db.sqlite.prepare('INSERT INTO community_daily(day,total,counters) VALUES (?,?,?)').run(earlier.day, earlier.total, earlier.counters);
   await add(db, today());
   const before = JSON.stringify(db.sqlite.prepare('SELECT * FROM community_daily ORDER BY day').all());
   const response = await onRequest(context(db));
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get('Cache-Control'), 'public, max-age=3600');
+  assert.equal(response.headers.get('Cache-Control'), 'public, max-age=60');
   const result = await response.json();
-  assert.equal(result.totalRange, '100-199');
-  assert.deepEqual(result.countries, [{ id: 'India', label: 'India', count: 100 }]);
+  assert.equal(result.total, 20);
+  assert.deepEqual(result.countries, [{ id: 'India', label: 'India', count: 20 }]);
   assert.equal(JSON.stringify(db.sqlite.prepare('SELECT * FROM community_daily ORDER BY day').all()), before);
 });
 
-test('capacity responses do not leak raw counts and storage failures reveal no internal details', async t => {
+test('GET uses a new schema cache key and POST bypasses any cached public summary', async t => {
+  const db = database(t);
+  const oldDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'caches');
+  t.after(() => { if (oldDescriptor) Object.defineProperty(globalThis, 'caches', oldDescriptor); else delete globalThis.caches; });
+  const entries = new Map([[`${origin}/api/community?snapshot=${today()}`, new Response(JSON.stringify({ status: 'collecting', totalRange: null }))]]);
+  const matched = [], writes = [], tasks = [];
+  Object.defineProperty(globalThis, 'caches', {
+    configurable: true,
+    value: { default: {
+      async match(request) { matched.push(request.url); return entries.get(request.url)?.clone(); },
+      async put(request, response) { writes.push(request.url); entries.set(request.url, response.clone()); },
+    } },
+  });
+  await add(db, today());
+  const firstContext = context(db);
+  firstContext.waitUntil = task => tasks.push(task);
+  const first = await onRequest(firstContext);
+  assert.equal((await first.json()).total, 1);
+  assert.equal(first.headers.get('Cache-Control'), 'public, max-age=60');
+  await Promise.all(tasks);
+  assert.deepEqual(matched, [`${origin}/api/community?schema=2&snapshot=${today()}`]);
+  assert.deepEqual(writes, matched);
+  const posted = await onRequest(context(db, { method: 'POST', body: sample }));
+  assert.equal((await posted.json()).summary.total, 2);
+  assert.equal(matched.length, 1);
+  assert.equal(writes.length, 1);
+});
+
+test('daily capacity bounds resource usage and storage failures reveal no internal details', async t => {
   const db = database(t);
   const full = row(today(), [[sample, 10000]]);
   db.sqlite.prepare('INSERT INTO community_daily(day,total,counters) VALUES (?,?,?)').run(full.day, full.total, full.counters);

@@ -4,6 +4,7 @@ import { evaluateProfile, formatDate, parseDate, compareCutoffs, parseInputDate,
 import { loadCareerIndex, loadCareerRows, autocompleteEmployers, searchSponsors, searchCareer, benchmarkOffer, careerRowsToCsv, employerProfilePath, employerIdFromPath, employerSalaryPath, employerIdFromSearch, buildEmployerProfile } from './career.js';
 import { compareProcessingMonth, formatProcessingMonth, processingFreshness } from './processing.js';
 import { createCommunityRecorder } from './community-client.js';
+import { validCommunitySummary } from './community.js';
 
 const icons = { Hourglass, Clock3, CalendarDays, BriefcaseBusiness, BookOpen, Unlock, ArrowUpRight, ArrowRight, ArrowLeft, Bookmark, Trash2, ShieldCheck, CircleCheck, CircleAlert, Share2, Printer, TrendingUp, Search, Download, ChevronLeft, ChevronRight, LockKeyhole, Info, Globe, RefreshCw, UsersRound };
 const main = document.querySelector('#main');
@@ -32,9 +33,8 @@ let careerToken = 0, chartWindow = 12, bulletinMonth, bulletinCountry = 'India',
 let offerSalary = '', offerCompared = false;
 let processingData, processingDate = '', processingQueue = 'perm-analystReview';
 let employerQuery = '', employerState = '', employerSort = 'filings', employerPage = 1;
-let communityRequest, communityExpires = 0;
-const privacySignal = () => navigator.globalPrivacyControl === true || [navigator.doNotTrack, window.doNotTrack, navigator.msDoNotTrack].includes('1');
-const recordCommunitySearch = createCommunityRecorder({ privacySignal });
+let communityRequest, communityData, communityExpires = 0;
+const recordCommunitySearch = createCommunityRecorder();
 let profile = { country: 'India', category: 'EB2', priorityDate: '2015-01-01', chart: 'finalAction', filingPath: 'aos' };
 const timelineProfiles = { employment: { ...profile }, family: { ...profile, category: 'F2A', priorityDate: '2024-01-01' } };
 const stored = () => { try { const value = JSON.parse(localStorage.getItem('gct.profiles') || '[]'); return Array.isArray(value) ? value.filter(p => bulletins.countries.some(c => c.id === p.country) && bulletins.categories.some(c => c.id === p.category) && parseDate(p.priorityDate) && ['filing', 'finalAction'].includes(p.chart) && ['aos', 'consular'].includes(p.filingPath)).slice(0, 8) : []; } catch { return []; } };
@@ -85,7 +85,7 @@ function profilePanel() {
   <form id="profile-form" class="profile-form" novalidate><div class="field"><label for="country">Country of chargeability</label><select id="country" name="country">${bulletins.countries.map(c => option(c.id, c.label, profile.country)).join('')}</select></div><div class="field"><label for="category">Preference category</label><select id="category" name="category">${routeCategories().map(c => option(c.id, c.label, profile.category)).join('')}</select></div>
   <div class="field full"><label for="priority-date" class="date-label">Priority date <span class="date-format">MM-DD-YYYY</span></label><input type="text" id="priority-date" name="priorityDate" required placeholder="MM-DD-YYYY" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="priority-date-error priority-date-hint" value="${esc(formatInputDate(profile.priorityDate) || '')}"><p id="priority-date-error" class="field-error" role="alert" hidden></p><p id="priority-date-hint" class="field-hint">Country is usually based on birth, not citizenship.</p></div>
   <div class="field full"><span class="field-label" id="chart-label">Bulletin chart</span><div class="segment" role="group" aria-labelledby="chart-label">${[['finalAction', 'Final action'], ['filing', 'Dates for filing']].map(([id, label]) => `<button type="button" data-chart="${id}" aria-pressed="${profile.chart === id}" class="${profile.chart === id ? 'active' : ''}">${label}</button>`).join('')}</div></div>
-  <div class="field full"><label for="filing-path">Processing path</label><select name="filingPath" id="filing-path">${option('aos', 'Adjustment of status (U.S.)', profile.filingPath)}${option('consular', 'Consular processing', profile.filingPath)}</select></div><p class="community-notice">Submitted checks add country, category and a five-year date range to community totals. Exact dates stay on your device. <a href="/privacy/">Privacy details</a>.${privacySignal() ? ' Your browser privacy signal disables counting.' : ''}</p><button type="submit" class="primary">${timelineRoute() === '/family-green-card/' ? 'Check my priority date' : 'Check my timeline'} ${icon('arrow-right')}</button></form><div class="local-note">${icon('shield-check')}<span>Saved profiles stay in this browser.</span></div></section>
+  <div class="field full"><label for="filing-path">Processing path</label><select name="filingPath" id="filing-path">${option('aos', 'Adjustment of status (U.S.)', profile.filingPath)}${option('consular', 'Consular processing', profile.filingPath)}</select></div><p class="community-notice">Submitted checks are recorded and displayed as public search totals. <a href="/privacy/">Data practices</a>.</p><button type="submit" class="primary">${timelineRoute() === '/family-green-card/' ? 'Check my priority date' : 'Check my timeline'} ${icon('arrow-right')}</button></form><div class="local-note">${icon('shield-check')}<span>Saved profiles stay in this browser.</span></div></section>
   ${stored().length ? `<section class="saved-profiles"><h3>Saved on this device</h3>${stored().map((p, i) => `<div class="saved-row"><button type="button" class="saved-load" data-load-profile="${i}">${esc(countryLabel(p.country))} ${esc(categoryLabel(p.category))}<br><span class="muted">${formatDate(p.priorityDate)}</span></button>${button('trash-2', 'Remove saved profile', 'remove-profile', `data-profile="${i}"`)}</div>`).join('')}</section>` : ''}
   <p class="source-note">${sourceLink(bulletins.sourceUrl, 'U.S. Department of State')}<br>Verified ${formatDate(bulletins.generatedAt)}<br><a href="/methodology/">Sources & limitations</a></p>`;
 }
@@ -251,39 +251,54 @@ function communityContainer() {
   return '<div id="community-totals" class="community-totals" aria-live="polite"><p class="chart-caption" role="status">Loading community totals...</p></div>';
 }
 function homeCommunity() {
-  return `<section id="community-trends" class="content-band home-community" aria-labelledby="community-trends-heading"><div class="section-heading"><div><h2 id="community-trends-heading">Community Search Trends</h2><p>Submitted checks / last 30 completed UTC days</p></div><a class="method-link" href="/community/">About these counts ${icon('arrow-up-right')}</a></div>${communityContainer()}<p class="chart-caption">Coarse totals, not unique people or government queue data. Exact dates are never sent to the counters. <a href="/privacy/">Privacy details</a>.</p></section>${adSpace('home-after-community')}`;
+  return `<section id="community-trends" class="content-band home-community" aria-labelledby="community-trends-heading"><div class="section-heading"><div><h2 id="community-trends-heading">Community Search Trends</h2><p>Recorded searches / last 30 UTC days, including today</p></div><a class="method-link" href="/community/">About these counts ${icon('arrow-up-right')}</a></div>${communityContainer()}<p class="chart-caption">Includes repeat searches. These are search counts, not unique people or government queue data. <a href="/privacy/">Data practices</a>.</p></section>${adSpace('home-after-community')}`;
 }
 function communitySummary(data) {
-  if (data.status === 'collecting') return '<div class="community-empty"><h3>Gathering the first searches</h3><p>Charts appear once the last 30 completed days contain at least 100 submitted checks. Small groups stay hidden. Today\'s checks appear no earlier than tomorrow.</p></div>';
-  return `<div class="community-summary"><strong>${esc(data.totalRange)}</strong><span>submitted checks in the published window</span><small>${formatDate(data.window.from)} to ${formatDate(data.window.through)}</small></div><div class="community-charts">${[['Country of chargeability',data.countries],['Visa preference category',data.categories],['Priority-date range',data.priorityPeriods]].map(([title,rows]) => `<section><h3>${title}</h3>${histogram(rows)}</section>`).join('')}</div><p class="chart-caption">Counts rounded down to tens. Groups below 20 checks are hidden. Repeat checks are possible; these are not representative of all applicants.</p>`;
+  return `<div class="community-summary"><strong>${number(data.total)}</strong><span>recorded ${data.total === 1 ? 'search' : 'searches'}</span><small>${formatDate(data.window.from)} to ${formatDate(data.window.through)} / UTC</small></div>${data.total ? `<div class="community-charts">${[['Country of chargeability',data.countries],['Visa preference category',data.categories],['Priority-date range',data.priorityPeriods]].map(([title,rows]) => `<section><h3>${title}</h3>${histogram(rows)}</section>`).join('')}</div>` : '<div class="community-empty"><h3>No recorded searches in this period</h3></div>'}`;
+}
+function rememberCommunitySummary(data) {
+  if (!validCommunitySummary(data)) return false;
+  // A slower response must not replace totals from a newer submitted search.
+  if (communityData && (data.window.through < communityData.window.through
+    || data.window.through === communityData.window.through && data.total < communityData.total)) return false;
+  communityData = data;
+  return true;
+}
+function publishCommunitySummary(data) {
+  if (!rememberCommunitySummary(data)) return;
+  communityRequest = Promise.resolve(communityData);
+  communityExpires = Math.min(Date.now() + 60_000, new Date().setUTCHours(24, 0, 0, 0));
+  const target = document.querySelector('#community-totals');
+  if (target) { target.innerHTML = communitySummary(communityData); createIcons({ icons }); }
 }
 async function loadCommunitySection() {
   const target = document.querySelector('#community-totals');
   if (!target) return;
   if (!communityRequest || Date.now() >= communityExpires) {
-    communityExpires = Math.min(Date.now() + 3_600_000, new Date().setUTCHours(24, 0, 0, 0));
+    communityExpires = Math.min(Date.now() + 60_000, new Date().setUTCHours(24, 0, 0, 0));
     communityRequest = (async () => {
-      const response = await fetch('/api/community', { credentials: 'omit', referrerPolicy: 'no-referrer' });
+      const response = await fetch('/api/community', { cache: 'no-cache', credentials: 'omit', referrerPolicy: 'no-referrer' });
       if (!response.ok) throw new Error('Community totals unavailable');
       const data = await response.json();
-      if (!['ready', 'collecting'].includes(data.status) || !parseDate(data.window?.from) || !parseDate(data.window?.through)
-        || ![data.countries, data.categories, data.priorityPeriods].every(rows => Array.isArray(rows) && rows.every(row => typeof row.label === 'string' && Number.isInteger(row.count) && row.count >= 20 && row.count % 10 === 0))
-        || data.status === 'ready' && !/^\d+-\d+$/.test(data.totalRange)) throw new Error('Invalid community totals');
+      if (!validCommunitySummary(data)) throw new Error('Invalid community totals');
       return data;
     })();
   }
   const request = communityRequest;
   try {
     const data = await request;
-    if (target.isConnected) target.innerHTML = communitySummary(data);
+    if (communityRequest !== request) return;
+    rememberCommunitySummary(data);
+    if (target.isConnected) target.innerHTML = communitySummary(communityData);
   } catch {
-    if (communityRequest === request) communityRequest = null;
+    if (communityRequest !== request) return;
+    communityRequest = null;
     if (target.isConnected) target.innerHTML = `<div class="inline-notice">${icon('info')}<span>Community totals are temporarily unavailable. Your calculator still works normally.</span></div>`;
   }
   if (target.isConnected) createIcons({ icons });
 }
 function renderCommunity() {
-  main.innerHTML = `${heading('/community/', 'Last 30 completed UTC days')}<div class="inline-notice">${icon('shield-check')}<span>Aggregated submitted checks, not unique people or government demand data. Exact dates are never sent to the counters. Counts can include repeat checks and are not representative of all applicants.</span></div>${communityContainer()}<section class="reading content-band"><h2>What is counted</h2><p>Valid submitted employment and family priority-date checks automatically contribute. The browser sends a chargeability group, visa category and five-year date range. There are no names, receipt numbers, exact dates, cookies, visitor IDs or free-text search logs in these counters.</p><p>Separate daily totals are stored for each dimension, not individual submissions or combinations. The public view excludes today, has no drill-down filters and suppresses small groups. These precautions reduce disclosure risk but are not a formal anonymity guarantee.</p><p>Browsing, typing, loading or saving profiles, chart changes, employer searches and PERM dates do not contribute. Do Not Track and Global Privacy Control disable counting. <a href="/privacy/">Privacy details</a>.</p></section>${adSpace('community-after-charts')}`;
+  main.innerHTML = `${heading('/community/', 'Last 30 UTC days, including today')}${communityContainer()}<section class="reading content-band"><h2>What is counted</h2><p>Submitted employment and family priority-date checks are automatically recorded and displayed as public totals by country of chargeability, visa preference category and priority-date range. Dates are grouped into five-year bands, plus before 2000 and 2030 or later. Repeat searches count again.</p><p>Charts include today and show exact counts from the first search, with no opt-in, browser-signal exclusion, minimum sample, hidden small groups or rounding. Counts measure search activity, not unique people or a representative applicant survey.</p><p>Browsing, typing, loading or saving profiles, chart changes, employer searches and PERM dates are not part of this tracker. <a href="/privacy/">Data practices</a>.</p></section>${adSpace('community-after-charts')}`;
   finishRender();
   void loadCommunitySection();
 }
@@ -292,9 +307,8 @@ function renderSources() {
   finishRender();
 }
 function renderPrivacy() {
-  main.innerHTML = `${heading('/privacy/')}<article class="reading"><div class="privacy-graphic">${icon('lock-keyhole')}<div><strong>Your calculator runs in your browser.</strong><p>No account or profile database.</p></div></div><h2>Profiles</h2><p>Your priority date and selections are processed on your device. Saving a profile uses this browser's local storage. It is not uploaded to an application database and does not sync across devices.</p><p>The share button creates a URL containing the profile fields. Share it only with people you want to see those details. The site removes those fields from the address bar after reading them; hosting providers can still receive a shared URL when it is opened.</p><button class="button-secondary" data-action="clear-storage">${icon('trash-2')}Clear saved profiles</button><h2>Public data and hosting</h2><p>The browser downloads public bulletin and employer data. Hosting infrastructure receives ordinary web requests and may keep security and operational logs, including IP addresses. External official-source links are separate websites with their own policies.</p><h2>Cookies and advertising</h2><p>There are no advertising scripts, third-party analytics scripts or account cookies in this version. Advertising may be added later; this policy and any required consent controls will be updated before it is enabled.</p><h2>Local downloads</h2><p>CSV exports and printing are generated in your browser. No document is uploaded to create a download.</p><p>Last updated: October 12, 2026.</p></article>`;
+  main.innerHTML = `${heading('/privacy/')}<article class="reading"><h2>Recorded searches</h2><p>Submitted employment and family priority-date checks are automatically recorded and displayed as public community totals. The browser sends country of chargeability, visa preference category and a priority-date range to our Cloudflare counter. Dates are grouped into five-year bands, plus before 2000 and 2030 or later. Repeated submissions count again.</p><p>There is no opt-in, per-tab contribution limit, duplicate filtering or browser-signal exclusion. Charts cover the last 30 UTC calendar days, including today, and show exact counts from the first search. New submissions update the submitter's charts immediately when the counter response is available; totals for other visitors can be cached for up to one minute.</p><p>The database stores separate daily counts for country, category and date range. It does not store exact dates, raw submissions, combinations, names, receipt numbers, visitor IDs, IP addresses or browser identifiers. Browsing, typing, loading or saving profiles, chart changes, employer searches and PERM dates are not recorded by this counter. Counts are search activity, not unique people or a representative applicant survey.</p><h2>Storage and availability</h2><p>Daily rollups older than 90 days are pruned when a new day receives a search; inactive rollups may remain longer. A 10,000-search daily cap bounds database work on the free tier. If a resource limit or outage prevents recording, the calculator still works.</p><h2>Profiles</h2><p>Priority-date calculations run in your browser. Saved profiles use this browser's local storage and do not sync across devices. There is no account or application profile database.</p><p>The share button creates a URL containing the profile fields. Share it only with people you want to see those details. The site removes those fields from the address bar after reading them; hosting providers can still receive a shared URL when it is opened.</p><button class="button-secondary" data-action="clear-storage">${icon('trash-2')}Clear saved profiles</button><h2>Public data and hosting</h2><p>The browser downloads public bulletin and employer data. Hosting infrastructure receives ordinary web requests and may keep security and operational logs, including IP addresses. These platform logs are separate from the search counters. External official-source links are separate websites with their own policies.</p><h2>Cookies and advertising</h2><p>There are no advertising scripts, third-party analytics scripts or account cookies in this version. Advertising may be added later; this policy and any required consent controls will be updated before it is enabled.</p><h2>Local downloads</h2><p>CSV exports and printing are generated in your browser. No document is uploaded to create a download.</p><p>Last updated: October 11, 2026.</p></article>`;
   finishRender();
-  main.querySelector('.reading').insertAdjacentHTML('beforeend', '<h2>Community totals</h2><p>Valid submitted employment and family priority-date checks automatically send a chargeability group, visa category and five-year date range to our Cloudflare counter, unless Do Not Track or Global Privacy Control is enabled. Exact dates, names, receipt numbers, visitor IDs, IP addresses and browser identifiers are not stored in the counter database. Browsing, typing, loading or saving profiles, chart changes, employer searches and PERM dates do not contribute.</p><p>The database stores separate daily counts, not individual submissions or combinations. The public view covers 30 completed UTC days, starts at 100 contributions, hides groups below 20 and rounds counts down to tens. Daily rollups older than 90 days are pruned when a new day receives a contribution; inactive rollups may remain longer. Counts are self-selected checks, not unique people or representative immigration demand.</p><p>The browser suppresses repeated identical country/category/date-range combinations within this tab and allows at most 10 contributions per tab. Reloading can allow repeat checks. Hosting infrastructure still receives ordinary requests and may keep operational logs. There is no third-party analytics script or advertising script.</p>');
 }
 function appendWageScope() {
   main.querySelector('.source-list')?.insertAdjacentHTML('afterend', '<p>Published wage records exclude other visa classes, non-certified filings, missing or unrecognized wage units, and annualized wages outside $5,000-$1,000,000. Full-time and part-time filings are included. Each record uses the primary disclosed worksite.</p>');
@@ -329,7 +343,13 @@ document.addEventListener('click', async event => {
   if (action === 'csv') { const result = searchCareer('', careerFilters, careerDataset); const url = URL.createObjectURL(new Blob([careerRowsToCsv(result.matchingRows)], { type: 'text/csv;charset=utf-8;' })); const link = document.createElement('a'); link.href = url; link.download = `h1b-wages-${careerIndex.scope.label}.csv`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 });
 document.addEventListener('submit', event => {
-  if (event.target.id === 'profile-form') { event.preventDefault(); if (readProfile()) { void recordCommunitySearch({ ...profile }); renderTimeline(); } }
+  if (event.target.id === 'profile-form') {
+    event.preventDefault();
+    if (readProfile()) {
+      void recordCommunitySearch({ ...profile }).then(response => { if (response?.summary) publishCommunitySummary(response.summary); });
+      renderTimeline();
+    }
+  }
   if (event.target.id === 'processing-form') { event.preventDefault(); compareProcessingDate(); }
   if (event.target.id === 'offer-form') { event.preventDefault(); offerSalary = document.querySelector('#offer-salary').value; offerCompared = true; renderOffer(); }
 });
