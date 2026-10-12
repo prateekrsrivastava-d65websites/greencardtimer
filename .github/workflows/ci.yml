@@ -17,6 +17,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SITE_URL: https://greencardtimer.pages.dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,3 +28,27 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Validate Sitemap
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          from urllib.parse import unquote, urlsplit
+          import os
+          import xml.etree.ElementTree as ET
+
+          dist = Path('dist').resolve()
+          origin = os.environ['SITE_URL']
+          namespace = 'http://www.sitemaps.org/schemas/sitemap/0.9'
+          root = ET.parse(dist / 'sitemap.xml').getroot()
+          assert root.tag == f'{{{namespace}}}urlset', 'Invalid sitemap namespace'
+          urls = [node.text for node in root.findall(f'{{{namespace}}}url/{{{namespace}}}loc')]
+          assert urls and all(urls) and len(urls) == len(root.findall(f'{{{namespace}}}url')) == len(set(urls)), 'Sitemap URLs must be nonempty and unique'
+          for url in urls:
+              parsed = urlsplit(url)
+              assert f'{parsed.scheme}://{parsed.netloc}' == origin and not parsed.query and not parsed.fragment, f'Noncanonical sitemap URL: {url}'
+              page = (dist / unquote(parsed.path).lstrip('/') / 'index.html').resolve()
+              assert page.is_relative_to(dist) and page.is_file(), f'Missing static page: {url}'
+          robots = (dist / 'robots.txt').read_text().splitlines()
+          assert robots == ['User-agent: *', 'Allow: /', f'Sitemap: {origin}/sitemap.xml'], 'Invalid robots.txt'
+          print(f'Validated {len(urls)} sitemap URLs and robots.txt')
+          PY
