@@ -8,8 +8,9 @@ import { formatDate } from '../src/model.js';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const ROUTES = [
-  { path: '/', title: 'Green Card Timer | Free Priority Date Tools', description: 'Check employment-based visa bulletin cutoffs, explore transparent priority-date trend scenarios, and compare public H-1B salary disclosures. Free, without an account.' },
-  { path: '/visa-bulletin/', title: 'Employment-Based Visa Bulletin | Green Card Timer', description: 'Explore official employment-based final action and filing dates, historical movement, and country-by-category visa bulletin cutoffs.' },
+  { path: '/', title: 'Green Card Timer | Free Priority Date Tools', description: 'Check employment-based and family-sponsored visa bulletin cutoffs, explore transparent priority-date history, and compare public H-1B salary disclosures. Free, without an account.' },
+  { path: '/visa-bulletin/', title: 'Employment & Family Visa Bulletin | Green Card Timer', description: 'Explore official employment-based and family-sponsored final action and filing dates, historical movement, and country-by-category visa bulletin cutoffs.' },
+  { path: '/family-green-card/', title: 'Family-Based Green Card Tracker | Green Card Timer', description: 'Check family preference priority dates for F1, F2A, F2B, F3 and F4. Compare official final action and filing cutoffs and monthly history without an account.' },
   { path: '/salary-data/', title: 'H-1B Salary Data & Sponsors | Green Card Timer', description: 'Search official Department of Labor H-1B disclosures by employer, location, and salary. Compare disclosed offers and download matching records.' },
   { path: '/methodology/', title: 'Sources & Methodology | Green Card Timer', description: 'Read the official data sources, cutoff rules, historical trend method, and limitations behind Green Card Timer. No guaranteed approval dates.' },
   { path: '/privacy/', title: 'Privacy | Green Card Timer', description: 'Learn how Green Card Timer handles local browser preferences and public-data searches without accounts, paywalls, or application analytics.' },
@@ -42,11 +43,22 @@ function sourceLink(url, label) {
   return `<a href="${xml(url)}" target="_blank" rel="noopener noreferrer">${xml(label)}</a>`;
 }
 
-function bulletinTable(data, bulletin, chart) {
+function bulletinTable(data, bulletin, chart, group) {
   const countries = data.countries;
   const headings = countries.map(country => `<th scope="col">${xml(country.label)}</th>`).join('');
-  const rows = data.categories.map(category => `<tr><th scope="row">${xml(category.label)}</th>${countries.map(country => `<td>${xml(formatDate(bulletin.charts[chart][category.id][country.id]))}</td>`).join('')}</tr>`).join('');
-  return `<div class="table-wrap"><table><thead><tr><th scope="col">Category</th>${headings}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  const categories = data.categories.filter(category => (category.group ?? 'employment') === group);
+  const rows = categories.map(category => `<tr><th scope="row">${xml(category.label)}</th>${countries.map(country => `<td>${xml(formatDate(bulletin.charts[chart][category.id][country.id]))}</td>`).join('')}</tr>`).join('');
+  const label = `${group === 'family' ? 'Family-Sponsored' : 'Employment-Based'} ${chart === 'finalAction' ? 'Final Action Dates' : 'Dates for Filing'}`;
+  return `<div class="table-wrap"><table aria-label="${xml(label)}"><thead><tr><th scope="col">Category</th>${headings}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function bulletinCharts(data, bulletin, group) {
+  const label = group === 'family' ? 'Family-Sponsored' : 'Employment-Based';
+  return `<h2>${xml(bulletin.label)} ${label} Final Action Dates</h2>${bulletinTable(data, bulletin, 'finalAction', group)}<h2>${xml(bulletin.label)} ${label} Dates for Filing</h2>${bulletinTable(data, bulletin, 'filing', group)}`;
+}
+
+function chartChoice(value) {
+  return value === 'finalAction' ? 'Final Action Dates' : value === 'filing' ? 'Dates for Filing' : 'Unknown; not independently verified';
 }
 
 export function initialContent(route, { bulletinData, careerData } = {}) {
@@ -57,9 +69,17 @@ export function initialContent(route, { bulletinData, careerData } = {}) {
   let title;
   let body;
   if (route.path === '/visa-bulletin/') {
-    title = 'Employment-Based Visa Bulletin';
-    body = latest ? `<h2>${xml(latest.label)} Final Action Dates</h2>${bulletinTable(bulletinData, latest, 'finalAction')}<h2>${xml(latest.label)} Dates for Filing</h2>${bulletinTable(bulletinData, latest, 'filing')}` : '<p>The latest verified bulletin tables are temporarily unavailable.</p>';
-    body += `<p>Current (C) means no cutoff; Unavailable (U) means no visas authorized. A priority date must be strictly earlier than a dated cutoff. These tables cover EB-1, EB-2, EB-3, other workers, and EB-5 unreserved.</p><p>${sourceLink(dos, 'Official State Department bulletin')}. ${sourceLink(uscis, 'Verify the chart USCIS permits for I-485')} before filing. A cutoff does not predict approval.</p>`;
+    title = 'Employment & Family Visa Bulletin';
+    body = latest ? `${bulletinCharts(bulletinData, latest, 'employment')}${bulletinCharts(bulletinData, latest, 'family')}` : '<p>The latest verified bulletin tables are temporarily unavailable.</p>';
+    body += `<p>Current (C) means no cutoff; Unavailable (U) means no visas authorized. A priority date must be strictly earlier than a dated cutoff. Employment tables cover EB-1, EB-2, EB-3, other workers, and EB-5 unreserved. Family tables cover F1, F2A, F2B, F3 and F4.</p><p>USCIS selects the employment and family I-485 charts separately each month. An unverified choice remains unknown. ${sourceLink(dos, 'Official State Department bulletin')}. ${sourceLink(uscis, 'Verify the applicable USCIS chart')} before filing. A cutoff does not predict approval.</p>`;
+  } else if (route.path === '/family-green-card/') {
+    title = 'Family-Based Green Card Tracker';
+    body = latest ? bulletinCharts(bulletinData, latest, 'family') : '<p>The latest verified family bulletin tables are temporarily unavailable.</p>';
+    if (bulletinData) {
+      const categories = bulletinData.categories.filter(category => category.group === 'family');
+      body += `<h2>Family Preference Categories</h2><dl>${categories.map(category => `<dt>${xml(category.label)}</dt><dd>${xml(category.description)}</dd>`).join('')}</dl>`;
+    }
+    body += `<p>Family preference visas have annual and per-country numerical limits. These are not the immediate-relative categories for spouses, unmarried children under 21, or parents of adult U.S. citizens. F1 here is a family preference, not an F-1 student visa.</p><p>A priority date must be strictly earlier than a dated cutoff. Official category and chargeability footnotes, including F2A per-country exemptions and allocation limits, also apply. Current (C) means no cutoff; Unavailable (U) means no visas authorized. Visa-number availability does not establish an approval or interview date.</p><p>USCIS family I-485 chart choice: ${xml(chartChoice(latest?.uscisFamilyChart))}. The employment chart choice does not determine the family chart choice. For consular processing, follow National Visa Center instructions; meeting a filing cutoff alone is not an invitation or appointment.</p><p>${sourceLink(dos, 'Official State Department bulletin')}. ${sourceLink(uscis, 'Verify the family chart USCIS permits for I-485')} before filing. <a href="/methodology/">Sources and limitations</a>.</p>`;
   } else if (route.path === '/salary-data/') {
     title = 'H-1B Salary Data';
     const scope = careerData?.scope;
@@ -67,17 +87,17 @@ export function initialContent(route, { bulletinData, careerData } = {}) {
     body += `<p>Records are certified H-1B LCAs with annualized wages from $5,000 through $1,000,000. Both full-time and part-time filings are included. Duplicate cases, other statuses and classes, and missing or unsupported wage units are excluded. This is a cumulative quarterly disclosure, not an entire historical database or a list of live job openings.</p><p>Disclosed wages are offers, not verified individual earnings. Certification does not establish visa issuance or green-card sponsorship. ${sourceLink(dol, 'Official DOL disclosure data')}.</p>`;
   } else if (route.path === '/methodology/') {
     title = 'Sources & Methodology';
-    body = `<h2>Official cutoff rules</h2><p>For a dated cutoff, the priority date must be strictly earlier, not equal. Current and Unavailable remain distinct states. The ${sourceLink(dos, 'State Department Visa Bulletin')} provides separate Final Action and Dates for Filing charts. ${sourceLink(uscis, 'USCIS selects the permitted I-485 chart each month')}; an unverified chart choice is marked unknown.</p><h2>Historical pace scenarios</h2><p>The tool measures net cutoff movement in complete six-month windows, retaining stalls and retrogression. Windows containing Current, Unavailable, or missing months are excluded. The 25th, 50th, and 75th percentile historical rates illustrate slower, typical, and faster movement; they are not probability bounds.</p><p>Scenarios require at least twelve months of history, three positive windows, a dated latest cutoff, and positive overall net movement. Nonpositive rates have no finite date, and no date is displayed beyond ten years. No inaccessible USCIS inventory or queue is invented. Cutoff eligibility, permission to file, agency processing, and individual approval are different questions.</p><h2>Salary scope</h2><p>${sourceLink(dol, 'DOL OFLC disclosures')} cover certified H-1B cases in the configured cumulative quarter. Both full-time and part-time filings are included. Annualization uses 2,080 hours, 52 weeks, 26 biweekly periods, or 12 months. Annualized wages outside $5,000-$1,000,000, unsupported units, other classes/statuses, and duplicate case numbers are excluded. One case can cover multiple workers or worksites; the primary disclosed worksite is used.</p><h2>Verification</h2><p>Every snapshot carries its official source and verification date. Failed downloads or changed table formats preserve the last verified data. Future demand, supply, policy, and agency decisions can diverge completely from historical movement. This independent educational tool is not a government service or legal advisor.</p>`;
+    body = `<h2>Official cutoff rules</h2><p>For a dated cutoff, the priority date must be strictly earlier, not equal. Current and Unavailable remain distinct states. The ${sourceLink(dos, 'State Department Visa Bulletin')} provides separate employment and family Final Action and Dates for Filing tables. ${sourceLink(uscis, 'USCIS selects the permitted I-485 charts each month')} separately for employment and family cases; an unverified chart choice is marked unknown. Family preference categories do not include the immediate relatives of U.S. citizens. A cutoff does not predict an interview appointment or individual approval.</p><h2>Employment Historical Pace Scenarios</h2><p>Employment scenarios measure net cutoff movement in complete six-month windows, retaining stalls and retrogression. Windows containing Current, Unavailable, or missing months are excluded. The 25th, 50th, and 75th percentile historical rates illustrate slower, typical, and faster movement; they are not probability bounds.</p><p>Scenarios require at least twelve months of history, three positive windows, a dated latest cutoff, and positive overall net movement. Nonpositive rates have no finite date, and no date is displayed beyond ten years. Family tracking shows current cutoffs and historical movement without dated projections. No inaccessible USCIS inventory or queue is invented. Cutoff eligibility, permission to file, agency processing, and individual approval are different questions.</p><h2>Salary scope</h2><p>${sourceLink(dol, 'DOL OFLC disclosures')} cover certified H-1B cases in the configured cumulative quarter. Both full-time and part-time filings are included. Annualization uses 2,080 hours, 52 weeks, 26 biweekly periods, or 12 months. Annualized wages outside $5,000-$1,000,000, unsupported units, other classes/statuses, and duplicate case numbers are excluded. One case can cover multiple workers or worksites; the primary disclosed worksite is used.</p><h2>Verification</h2><p>Every snapshot carries its official source and verification date. Failed downloads or changed table formats preserve the last verified data. Future demand, supply, policy, and agency decisions can diverge completely from historical movement. This independent educational tool is not a government service or legal advisor.</p>`;
   } else if (route.path === '/privacy/') {
     title = 'Privacy';
     body = '<h2>Local profiles</h2><p>Priority-date selections are processed in your browser. Saved profiles use local storage on this device; there is no account or application profile database. Shared profile links contain their fields, so recipients and hosting infrastructure may receive those details when a link is opened.</p><h2>Public data and hosting</h2><p>The browser downloads public bulletin and employer data. Hosting providers receive ordinary requests and may keep security and operational logs, including IP addresses. Official external links have their own policies.</p><h2>No third-party tracking</h2><p>This version includes no advertising scripts, third-party analytics, payment processing, or account cookies. CSV exports and printing happen locally in your browser.</p><p>Last updated: October 11, 2026.</p>';
   } else {
     title = 'Green Card Timer';
-    body = '<p>Free employment-based priority-date checks and public salary disclosures. No account required.</p>';
+    body = '<p>Free employment-based and family preference priority-date checks and public salary disclosures. No account required.</p>';
     if (latest) {
       body += `<h2>${xml(latest.label)} India EB-2</h2><div class="table-wrap"><table><thead><tr><th scope="col">Final Action Date</th><th scope="col">Dates for Filing</th></tr></thead><tbody><tr><td>${xml(formatDate(latest.charts.finalAction.EB2.India))}</td><td>${xml(formatDate(latest.charts.filing.EB2.India))}</td></tr></tbody></table></div><p>A priority date must be strictly earlier than the cutoff. Final action availability does not establish individual approval. ${sourceLink(uscis, 'Check USCIS chart selection')} before filing I-485.</p><p>${sourceLink(dos, `${latest.label} official bulletin`)}.</p>`;
     }
-    body += '<p><a href="/visa-bulletin/">Employment-based visa bulletin tables</a> | <a href="/salary-data/">H-1B salary disclosures</a> | <a href="/methodology/">Sources and limitations</a></p>';
+    body += '<p><a href="/visa-bulletin/">Employment and family visa bulletin tables</a> | <a href="/family-green-card/">Family-based green card tracker</a> | <a href="/salary-data/">H-1B salary disclosures</a> | <a href="/methodology/">Sources and limitations</a></p>';
   }
   return `<div class="page-heading"><div><h1>${xml(title)}</h1></div></div><article class="reading">${body}</article>`;
 }

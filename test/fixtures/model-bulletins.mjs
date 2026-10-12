@@ -1,5 +1,11 @@
 const countries = ['India', 'China', 'Mexico', 'Philippines', 'ROW'].map(id => ({ id, label: id }));
-const categories = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5'].map(id => ({ id, label: id }));
+const categories = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'].map(id => ({ id, label: id, group: id.startsWith('F') ? 'family' : 'employment' }));
+
+// Exact F4 table cells from the October 2026 official DOS HTML, including the Mexico line break.
+export const officialOctoberFamilyRows = {
+  finalAction: '<td>F4</td><td>22OCT11</td><td>22OCT11</td><td>15DEC06</td><td>22APR01<br>\n</td><td>15MAY08</td>',
+  filing: '<td>F4</td><td>01NOV11</td><td>01NOV11</td><td>01FEB07</td><td>30APR01</td><td>22MAR09</td>',
+};
 
 // Freeze the India EB-2 regression history; other cells are distinct synthetic parser inputs.
 const finalActionCutoffs = [
@@ -37,6 +43,7 @@ export const bulletinData = {
       publishedAt: '2026-09-04',
       verifiedAt: '2026-10-11',
       uscisEmploymentChart: null,
+      uscisFamilyChart: null,
       charts,
     };
   }),

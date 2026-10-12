@@ -8,9 +8,9 @@ import { discoverBulletins, fetchOfficialHTML, refresh } from '../scripts/refres
 
 const template = JSON.parse(await readFile(new URL('../public/data/model.json', import.meta.url), 'utf8'));
 const metadata = JSON.parse(await readFile(new URL('../public/data/bulletins.json', import.meta.url), 'utf8'));
-const categories = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5'];
+const categories = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
 const countries = ['ROW', 'China', 'India', 'Mexico', 'Philippines'];
-const labels = { EB1: '1st', EB2: '2nd', EB3: '3rd', EB3OW: 'Other Workers', EB5: '5th Unreserved' };
+const labels = { EB1: '1st', EB2: '2nd', EB3: '3rd', EB3OW: 'Other Workers', EB5: '5th Unreserved', F1: 'F1', F2A: 'F2A', F2B: 'F2B', F3: 'F3', F4: 'F4' };
 const now = new Date('2030-10-15T13:17:00Z');
 
 function monthsEnding(month, length = 25) {
@@ -28,13 +28,17 @@ function bulletin(month) {
   const year = date.getUTCFullYear();
   const fiscalYear = year + (date.getUTCMonth() >= 9 ? 1 : 0);
   return { month, label: `${name} ${year}`, sourceUrl: `https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/${fiscalYear}/visa-bulletin-for-${name.toLowerCase()}-${year}.html`,
-    publishedAt: null, verifiedAt: '2030-10-02', uscisEmploymentChart: null, uscisSourceUrl: 'https://www.uscis.gov/visabulletininfo',
+    publishedAt: null, verifiedAt: '2030-10-02', uscisEmploymentChart: null, uscisFamilyChart: null, uscisSourceUrl: 'https://www.uscis.gov/visabulletininfo',
     charts: Object.fromEntries(['finalAction', 'filing'].map(chart => [chart, Object.fromEntries(categories.map(category => [category, Object.fromEntries(countries.map(country => [country, '2001-01-01']))]))])) };
 }
 
 function htmlFor(value) {
   const token = date => date === '2001-01-01' ? '01JAN01' : date === '2001-02-01' ? '01FEB01' : date;
-  const tables = ['finalAction', 'filing'].map(chart => `<p>${chart === 'finalAction' ? 'A. FINAL ACTION DATES FOR EMPLOYMENT-BASED PREFERENCE CASES' : 'B. DATES FOR FILING OF EMPLOYMENT-BASED VISA APPLICATIONS'}</p><table><tr><th>Employment-based</th><th>All Chargeability Areas Except Those Listed</th><th>CHINA-mainland born</th><th>INDIA</th><th>MEXICO</th><th>PHILIPPINES</th></tr>${categories.map(category => `<tr><td>${labels[category]}</td>${countries.map(country => `<td>${token(value.charts[chart][category][country])}</td>`).join('')}</tr>`).join('')}</table>`).join('');
+  const tables = ['employment', 'family'].flatMap(group => ['finalAction', 'filing'].map(chart => {
+    const groupLabel = group === 'family' ? 'FAMILY-SPONSORED' : 'EMPLOYMENT-BASED';
+    const heading = chart === 'finalAction' ? `FINAL ACTION DATES FOR ${groupLabel} PREFERENCE CASES` : `DATES FOR FILING ${group === 'family' ? '' : 'OF '}${groupLabel} VISA APPLICATIONS`;
+    return `<p>${chart === 'finalAction' ? 'A' : 'B'}. ${heading}</p><table><tr><th>${group}</th><th>All Chargeability Areas Except Those Listed</th><th>CHINA-mainland born</th><th>INDIA</th><th>MEXICO</th><th>PHILIPPINES</th></tr>${categories.filter(category => category.startsWith('F') === (group === 'family')).map(category => `<tr><td>${labels[category]}</td>${countries.map(country => `<td>${token(value.charts[chart][category][country])}</td>`).join('')}</tr>`).join('')}</table>`;
+  })).join('');
   return `<html><body><h1>Visa Bulletin For ${value.label}</h1>${tables}</body></html>`;
 }
 
@@ -116,6 +120,7 @@ test('a new monthly bulletin rolls history and also checks the current edition f
   const fixture = await setup(t);
   const current = structuredClone(fixture.values[0]);
   current.charts.finalAction.EB2.India = '2001-02-01';
+  current.charts.filing.F2A.Mexico = '2001-02-01';
   const mock = source([bulletin('2030-11'), current, ...fixture.values.slice(1)]);
   await refresh({ ...fixture, fetchImpl: mock.fetchImpl, now });
   const data = JSON.parse(await readFile(fixture.bulletinPath, 'utf8'));
@@ -123,10 +128,39 @@ test('a new monthly bulletin rolls history and also checks the current edition f
   assert.equal(data.bulletins.length, 25);
   assert.equal(data.bulletins.at(-1).month, '2028-11');
   assert.equal(data.bulletins[1].charts.finalAction.EB2.India, '2001-02-01');
+  assert.equal(data.bulletins[1].charts.filing.F2A.Mexico, '2001-02-01');
   assert.equal(data.generatedAt, '2030-10-15');
   const model = JSON.parse(await readFile(fixture.modelPath, 'utf8'));
   assert.equal(model.bulletinMonth, '2030-11');
   assert.deepEqual(model.series, buildModelData(data, model).series);
+});
+
+test('employment-only history is backfilled once, then complete older months are reused', async t => {
+  const fixture = await setup(t);
+  const data = JSON.parse(await readFile(fixture.bulletinPath, 'utf8'));
+  for (const value of data.bulletins) {
+    for (const chart of ['finalAction', 'filing']) for (const category of categories.filter(category => category.startsWith('F'))) delete value.charts[chart][category];
+    delete value.uscisFamilyChart;
+  }
+  data.categories = data.categories.filter(category => !category.id.startsWith('F'));
+  await writeFile(fixture.bulletinPath, `${JSON.stringify(data, null, 2)}\n`);
+  const mock = source(fixture.values);
+  await refresh({ ...fixture, fetchImpl: mock.fetchImpl, now });
+  const refreshed = JSON.parse(await readFile(fixture.bulletinPath, 'utf8'));
+  assert.equal(refreshed.categories.length, 10);
+  assert.equal(refreshed.categories.filter(category => category.group === 'family').length, 5);
+  assert.equal(refreshed.bulletins.length, 25);
+  for (const value of refreshed.bulletins) {
+    assert.equal(value.uscisFamilyChart, null);
+    assert.equal(Object.values(value.charts).flatMap(chart => Object.values(chart).flatMap(Object.values)).length, 100);
+  }
+  const firstPages = mock.calls.filter(({ url }) => !url.endsWith('/visa-bulletin.html') && new URL(url).hostname === 'adoption.state.gov');
+  assert.equal(firstPages.length, 25);
+  mock.calls.length = 0;
+  const result = await refresh({ ...fixture, fetchImpl: mock.fetchImpl, now });
+  assert.equal(result.changed, false);
+  const nextPages = mock.calls.filter(({ url }) => !url.endsWith('/visa-bulletin.html') && new URL(url).hostname === 'adoption.state.gov');
+  assert.equal(nextPages.length, 2);
 });
 
 test('a genuine monthly successful-check record changes without changing cutoff dates', async t => {
@@ -138,6 +172,21 @@ test('a genuine monthly successful-check record changes without changing cutoff 
   assert.equal(result.changed, true);
   assert.equal(data.refresh.checkedAt, '2030-11-05');
   assert.equal(data.generatedAt, '2030-10-15');
+});
+
+test('a family-only correction changes the dataset and regenerates its model summary', async t => {
+  const fixture = await setup(t);
+  const corrected = structuredClone(fixture.values);
+  corrected[0].charts.finalAction.F4.India = '2001-02-01';
+  const mock = source(corrected);
+  const result = await refresh({ ...fixture, fetchImpl: mock.fetchImpl, now });
+  assert.equal(result.changed, true);
+  const data = JSON.parse(await readFile(fixture.bulletinPath, 'utf8'));
+  assert.equal(data.bulletins[0].charts.finalAction.F4.India, '2001-02-01');
+  assert.equal(data.bulletins[0].charts.finalAction.EB2.India, '2001-01-01');
+  assert.equal(data.generatedAt, '2030-10-15');
+  const model = JSON.parse(await readFile(fixture.modelPath, 'utf8'));
+  assert.ok(model.series['India:F4:finalAction'].netMovementMonths > 0);
 });
 
 test('fetch failures, malformed tables, gaps and stale or unexpected months preserve both files', async t => {

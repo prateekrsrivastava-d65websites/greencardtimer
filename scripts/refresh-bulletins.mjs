@@ -8,7 +8,20 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const INDEX_URL = 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html';
 const OFFICIAL_HOSTS = ['travel.state.gov', 'adoption.state.gov', 'adoptions.state.gov'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const CATEGORIES = ['EB1', 'EB2', 'EB3', 'EB3OW', 'EB5'];
+const CATEGORY_METADATA = [
+  { id: 'EB1', label: 'EB-1', group: 'employment' },
+  { id: 'EB2', label: 'EB-2', group: 'employment' },
+  { id: 'EB3', label: 'EB-3', group: 'employment' },
+  { id: 'EB3OW', label: 'EB-3 Other Workers', group: 'employment' },
+  { id: 'EB5', label: 'EB-5 Unreserved', group: 'employment' },
+  { id: 'F1', label: 'F1', group: 'family', description: 'Unmarried sons and daughters of U.S. citizens' },
+  { id: 'F2A', label: 'F2A', group: 'family', description: 'Spouses and children of permanent residents' },
+  { id: 'F2B', label: 'F2B', group: 'family', description: 'Unmarried sons and daughters (21 or older) of permanent residents' },
+  { id: 'F3', label: 'F3', group: 'family', description: 'Married sons and daughters of U.S. citizens' },
+  { id: 'F4', label: 'F4', group: 'family', description: 'Brothers and sisters of adult U.S. citizens' },
+];
+const CATEGORIES = CATEGORY_METADATA.map(category => category.id);
+const GROUP_CATEGORIES = Object.fromEntries(['employment', 'family'].map(group => [group, CATEGORY_METADATA.filter(category => category.group === group).map(category => category.id)]));
 const COUNTRIES = ['India', 'China', 'Mexico', 'Philippines', 'ROW'];
 const compact = value => value.replace(/\s+/g, ' ').trim();
 
@@ -25,6 +38,7 @@ export function parseDOSDate(value) {
 }
 
 function categoryFor(value) {
+  if (/^F(?:1|2A|2B|3|4)$/i.test(value)) return value.toUpperCase();
   if (/^1st\b/i.test(value)) return 'EB1';
   if (/^2nd\b/i.test(value)) return 'EB2';
   if (/^3rd\b/i.test(value)) return 'EB3';
@@ -70,36 +84,38 @@ export function parseBulletinHTML(html, sourceUrl, verifiedAt = new Date().toISO
   if (!match || !monthNumber) throw new Error('The bulletin title format changed.');
   const month = `${match[2]}-${String(monthNumber).padStart(2, '0')}`;
   const tables = {};
-  let activeChart = null;
+  let activeSection = null;
   $('body').find('*').each((_, element) => {
     if (element.tagName !== 'table') {
       const heading = compact($(element).text()).toUpperCase();
-      if (/^(?:[A-Z]\.\s*)?FINAL ACTION DATES FOR EMPLOYMENT-BASED PREFERENCE CASES$/.test(heading)) activeChart = 'finalAction';
-      if (/^(?:[A-Z]\.\s*)?DATES FOR FILING OF EMPLOYMENT-BASED VISA APPLICATIONS$/.test(heading)) activeChart = 'filing';
+      if (/^(?:[A-Z]\.\s*)?FINAL ACTION DATES FOR (?:FAMILY-SPONSORED|EMPLOYMENT-BASED) PREFERENCE CASES$/.test(heading)) activeSection = { group: heading.includes('FAMILY-SPONSORED') ? 'family' : 'employment', chart: 'finalAction' };
+      if (/^(?:[A-Z]\.\s*)?DATES FOR FILING (?:OF )?(?:FAMILY-SPONSORED|EMPLOYMENT-BASED) VISA APPLICATIONS$/.test(heading)) activeSection = { group: heading.includes('FAMILY-SPONSORED') ? 'family' : 'employment', chart: 'filing' };
       return;
     }
     const rows = $(element).find('tr').map((__, row) => [$(row).children('td,th').map((___, cell) => compact($(cell).text())).get()]).get();
     const header = rows.find(row => row.some(cell => countryFor(cell) === 'India') && row.some(cell => countryFor(cell) === 'ROW'));
     if (!header) return;
-    if (!COUNTRIES.every(country => header.filter(cell => countryFor(cell) === country).length === 1)) throw new Error('An employment table has missing or duplicate country columns.');
+    if (!COUNTRIES.every(country => header.filter(cell => countryFor(cell) === country).length === 1)) throw new Error('A preference table has missing or duplicate country columns.');
     const columns = Object.fromEntries(header.map((cell, index) => [countryFor(cell), index]).filter(([country]) => country));
     const chart = {};
     for (const row of rows) {
       const category = categoryFor(row[0] ?? '');
       if (!category) continue;
-      if (chart[category]) throw new Error(`Duplicate ${category} row in an employment table.`);
+      if (chart[category]) throw new Error(`Duplicate ${category} row in a preference table.`);
       chart[category] = Object.fromEntries(COUNTRIES.map(country => {
         if (columns[country] === undefined || !row[columns[country]]) throw new Error(`The ${country} column format changed.`);
         return [country, parseDOSDate(row[columns[country]])];
       }));
     }
     if (!Object.keys(chart).length) return;
-    if (!CATEGORIES.every(category => chart[category])) throw new Error('An employment table is missing a tracked category.');
-    if (!activeChart) throw new Error('An employment table has no recognized chart heading.');
-    if (tables[activeChart]) throw new Error(`Duplicate ${activeChart} employment table.`);
-    tables[activeChart] = chart;
+    if (!activeSection) throw new Error('A preference table has no recognized chart heading.');
+    const { group, chart: chartName } = activeSection;
+    if (!GROUP_CATEGORIES[group].every(category => chart[category]) || Object.keys(chart).some(category => !GROUP_CATEGORIES[group].includes(category))) throw new Error(`A ${group} table is missing a tracked category or has an unexpected category.`);
+    const sectionKey = `${group}:${chartName}`;
+    if (tables[sectionKey]) throw new Error(`Duplicate ${chartName} ${group} table.`);
+    tables[sectionKey] = chart;
   });
-  if (!tables.finalAction || !tables.filing) throw new Error(`Expected two labeled employment tables; found ${Object.keys(tables).length}.`);
+  if (Object.keys(tables).length !== 4) throw new Error(`Expected four labeled family and employment tables; found ${Object.keys(tables).length}.`);
   const published = compact($('body').text()).match(/CA\/VO:\s*(\w+ \d{1,2}, \d{4})/i);
   return validateBulletin({
     month,
@@ -108,8 +124,9 @@ export function parseBulletinHTML(html, sourceUrl, verifiedAt = new Date().toISO
     publishedAt: published ? new Date(`${published[1]} UTC`).toISOString().slice(0, 10) : null,
     verifiedAt,
     uscisEmploymentChart: null,
+    uscisFamilyChart: null,
     uscisSourceUrl: 'https://www.uscis.gov/visabulletininfo',
-    charts: tables,
+    charts: Object.fromEntries(['finalAction', 'filing'].map(chart => [chart, { ...tables[`employment:${chart}`], ...tables[`family:${chart}`] }])),
   });
 }
 
@@ -179,7 +196,8 @@ export async function refresh({ offline = false, maxMonths = 25, root = ROOT, fe
     let contentChanged = saved.latestMonth !== links[0].month;
     for (const link of links) {
       const old = saved.bulletins.find(bulletin => bulletin.month === link.month);
-      if (old && monthIndex(link.month) < Math.min(monthIndex(saved.latestMonth), monthIndex(today.slice(0, 7))) - 1) { bulletins.push(validateBulletin(old)); continue; }
+      const oldComplete = old && ['finalAction', 'filing'].every(chart => CATEGORIES.every(category => COUNTRIES.every(country => old.charts?.[chart]?.[category]?.[country] !== undefined)));
+      if (oldComplete && monthIndex(link.month) < Math.min(monthIndex(saved.latestMonth), monthIndex(today.slice(0, 7))) - 1) { bulletins.push(validateBulletin(old)); continue; }
       const page = await fetchOfficialHTML(link.url, fetchImpl, html => {
         const bulletin = parseBulletinHTML(html, link.url, today);
         if (bulletin.month !== link.month) throw new Error(`Index and bulletin disagree for ${link.month}.`);
@@ -201,12 +219,14 @@ export async function refresh({ offline = false, maxMonths = 25, root = ROOT, fe
     // One genuine successful-check record per month keeps the public repository's schedule active.
     const reuseCheck = !contentChanged && previousCheck?.checkedAt?.slice(0, 7) === today.slice(0, 7)
       && ['latestMonth', 'indexRetrievedFrom', 'latestRetrievedFrom'].every(key => previousCheck[key] === check[key]);
-    data = { ...saved, generatedAt: contentChanged ? today : saved.generatedAt, latestMonth: bulletins[0].month,
-      verificationMethod: 'Official DOS HTML tables identified by chart heading and parsed with Cheerio; all tracked cells and contiguous monthly history validated.',
+    data = { ...saved, generatedAt: contentChanged ? today : saved.generatedAt, latestMonth: bulletins[0].month, categories: CATEGORY_METADATA,
+      verificationMethod: 'Four official DOS family and employment HTML tables identified by chart heading and parsed with Cheerio; all 100 tracked cells and contiguous monthly history validated.',
       bulletins, refresh: reuseCheck ? previousCheck : check };
     template.sourceAccess.automation = 'GitHub Actions checks weekly. Official DOS HTML is fetched from travel.state.gov or its openly published adoption.state.gov/adoptions.state.gov hosts. Canonical sources and actual retrieval URLs are retained. All tracked cells and contiguous history are validated; errors preserve the published data. A monthly successful-check record does not change the data verification date.';
   }
   data.bulletins.forEach(validateBulletin);
+  template.methodology.familyCategories = 'Family-sponsored preference categories show sourced cutoff history only; no dated scenarios or approval forecasts are generated.';
+  template.sourceAccess.bulletins = 'Twenty-five contiguous official DOS bulletins include both Final Action Dates and Dates for Filing for five employment and five family preference categories across five chargeability areas. Canonical source and actual retrieval URLs are retained.';
   const model = buildModelData(data, template);
   await atomicJSON(bulletinPath, data);
   await atomicJSON(modelPath, model);

@@ -8,11 +8,29 @@ export function parseDate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
 }
 
+export function parseInputDate(value) {
+  if (typeof value !== 'string' || !/^\d{2}-\d{2}-\d{4}$/.test(value)) return null;
+  const [month, day, year] = value.split('-');
+  const iso = `${year}-${month}-${day}`;
+  return parseDate(iso) ? iso : null;
+}
+
+export function formatInputDate(value) {
+  if (!parseDate(value)) return null;
+  const [year, month, day] = value.split('-');
+  return `${month}-${day}-${year}`;
+}
+
 export function formatDate(value) {
   if (value === 'C') return 'Current';
   if (value === 'U') return 'Unavailable';
   const date = parseDate(value);
   return date ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(date) : 'Not verified';
+}
+
+export function categoryGroup(category, bulletinData) {
+  const group = bulletinData?.categories?.find(item => item.id === category)?.group;
+  return group === 'family' || group === 'employment' ? group : /^F\d/.test(category ?? '') ? 'family' : 'employment';
 }
 
 export function monthIndex(value) {
@@ -125,7 +143,9 @@ export function evaluateProfile(profile, bulletinData, modelData) {
   const { country, category, priorityDate, chart = 'finalAction', filingPath = 'aos', bulletinMonth } = profile;
   const bulletin = (bulletinData.bulletins ?? []).find(item => item.month === (bulletinMonth ?? bulletinData.latestMonth)) ?? null;
   const cutoff = bulletin?.charts?.[chart]?.[category]?.[country] ?? null;
-  const base = { cutoff, bulletin, current: null, monthsBehind: null, scenarios: null, trend: null, canFile: null, approvalEligible: null, chartChoiceKnown: false, filingChart: bulletin?.uscisEmploymentChart ?? null };
+  const group = categoryGroup(category, bulletinData);
+  const filingChart = bulletin?.[group === 'family' ? 'uscisFamilyChart' : 'uscisEmploymentChart'] ?? null;
+  const base = { cutoff, bulletin, categoryGroup: group, current: null, monthsBehind: null, scenarios: null, trend: null, canFile: null, approvalEligible: null, chartChoiceKnown: false, filingChart };
   if (!parseDate(priorityDate) || !CHARTS.includes(chart) || !['aos', 'consular'].includes(filingPath)) {
     return { ...base, status: 'invalid', reason: 'Enter a valid priority date, chart and filing path.' };
   }
@@ -133,14 +153,18 @@ export function evaluateProfile(profile, bulletinData, modelData) {
   const selected = cutoffStatus(priorityDate, cutoff);
   const finalActionCutoff = bulletin.charts?.finalAction?.[category]?.[country] ?? null;
   const filingCutoff = bulletin.charts?.filing?.[category]?.[country] ?? null;
-  const chartChoiceKnown = CHARTS.includes(bulletin.uscisEmploymentChart);
+  const chartChoiceKnown = CHARTS.includes(filingChart);
   const numericFiling = cutoffStatus(priorityDate, filingCutoff).current;
-  const canFile = filingPath === 'consular' ? numericFiling : chartChoiceKnown ? cutoffStatus(priorityDate, bulletin.charts[bulletin.uscisEmploymentChart]?.[category]?.[country]).current : null;
+  const canFile = filingPath === 'consular' ? numericFiling : chartChoiceKnown ? cutoffStatus(priorityDate, bulletin.charts[filingChart]?.[category]?.[country]).current : null;
   const history = { ...bulletinData, bulletins: bulletinData.bulletins.filter(item => item.month <= bulletin.month) };
   const parameters = modelData?.methodology?.parameters ?? {};
   const trend = deriveSeries(history, country, category, chart, parameters);
   const gap = parseDate(cutoff) ? Math.max(0, monthsBetween(cutoff, priorityDate)) : null;
-  const result = { ...base, ...selected, finalActionCutoff, filingCutoff, monthsBehind: gap, trend, canFile, chartChoiceKnown, approvalEligible: cutoffStatus(priorityDate, finalActionCutoff).current, forecastKind: 'illustrative-trend', forecastReason: null };
+  const result = { ...base, ...selected, finalActionCutoff, filingCutoff, monthsBehind: gap, trend, canFile, chartChoiceKnown, approvalEligible: cutoffStatus(priorityDate, finalActionCutoff).current, forecastKind: group === 'family' ? 'history-only' : 'illustrative-trend', forecastReason: null };
+  if (group === 'family') {
+    result.forecastReason = 'Family preference categories show verified cutoff history only. No dated trend scenarios or approval-date forecasts are produced.';
+    return result;
+  }
   if (selected.status !== 'waiting') {
     result.forecastReason = selected.status === 'current' ? 'The selected cutoff is already met. A current cutoff does not predict the approval date.' : 'No dated cutoff is available to project from this bulletin.';
     return result;

@@ -31,7 +31,7 @@ jobs:
       - run: npm run build
       - name: Refresh Summary
         run: |
-          node --input-type=module -e 'import { readFileSync } from "node:fs"; import { appendFileSync } from "node:fs"; const data = JSON.parse(readFileSync("public/data/bulletins.json", "utf8")); appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Official bulletin check\n\nLatest edition: ${data.latestMonth}\n\nSuccessful check record: ${data.refresh.checkedAt}\n\nRetrieval: ${data.refresh.latestRetrievedFrom}\n\nBoth employment charts, all 50 tracked cells, monthly continuity, tests and build passed. Unchanged weekly checks do not create commits.\n`);'
+          node --input-type=module -e 'import { readFileSync } from "node:fs"; import { appendFileSync } from "node:fs"; const data = JSON.parse(readFileSync("public/data/bulletins.json", "utf8")); appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Official bulletin check\n\nLatest edition: ${data.latestMonth}\n\nSuccessful check record: ${data.refresh.checkedAt}\n\nRetrieval: ${data.refresh.latestRetrievedFrom}\n\nAll four employment/family tables, all 100 tracked cells, monthly continuity, tests and build passed. Unchanged weekly checks do not create commits.\n`);'
       - name: Commit Only Changed, Validated Data
         run: |
           git add -- public/data/bulletins.json public/data/model.json
