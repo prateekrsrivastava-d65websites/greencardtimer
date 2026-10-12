@@ -9,6 +9,7 @@ import argparse
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 import hashlib
+import importlib.util
 import json
 import math
 from pathlib import Path
@@ -16,14 +17,18 @@ import re
 import statistics
 import sys
 import time
-import urllib.request
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 import xml.etree.ElementTree as ET
 import zipfile
 
 NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-DEFAULT_URL = "https://www.dol.gov//media/LCA_Disclosure_Data_FY2026_Q3.xlsx"
+MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "career-release.json"
 SOURCE_PAGE = "https://www.dol.gov/agencies/eta/foreign-labor/performance"
+MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024
+MAX_DOWNLOAD_SECONDS = 180
+MAX_XLSX_BYTES = 4 * 1024 * 1024 * 1024
+MAX_ZIP_ENTRIES = 2000
+MAX_SOURCE_ROWS = 2_000_000
 COLUMNS = ["id", "title", "soc", "city", "state", "wage", "wageTo",
            "prevailingWage", "wageLevel", "date", "decisionDate", "beginDate",
            "fullTime", "petitionType", "status"]
@@ -44,6 +49,43 @@ SECTORS = {"11": "Agriculture", "21": "Mining", "22": "Utilities",
            "56": "Administrative services", "61": "Education",
            "62": "Healthcare", "71": "Arts and recreation",
            "72": "Hospitality", "81": "Other services", "92": "Public administration"}
+
+_SOURCE_SPEC = importlib.util.spec_from_file_location(
+    "dol_source", Path(__file__).with_name("dol-source.py")
+)
+dol_source = importlib.util.module_from_spec(_SOURCE_SPEC)
+_SOURCE_SPEC.loader.exec_module(dol_source)
+
+
+def default_source(manifest_path=MANIFEST_PATH):
+    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("source"), dict):
+        raise ValueError("DOL release manifest is missing source metadata")
+    return dol_source.canonical_dol_url(manifest["source"].get("url"))
+
+
+def validate_workbook(path, check_crc=False):
+    if path.stat().st_size > MAX_DOWNLOAD_BYTES:
+        raise ValueError("DOL workbook exceeds the download size limit")
+    try:
+        with zipfile.ZipFile(path) as archive:
+            entries = archive.infolist()
+            names = [entry.filename for entry in entries]
+            if not entries or len(entries) > MAX_ZIP_ENTRIES:
+                raise ValueError("DOL workbook exceeds the ZIP entry limit")
+            if len(set(names)) != len(names):
+                raise ValueError("DOL workbook contains duplicate ZIP entries")
+            if any(entry.flag_bits & 1 for entry in entries):
+                raise ValueError("Encrypted DOL workbooks are unsupported")
+            if sum(entry.file_size for entry in entries) > MAX_XLSX_BYTES:
+                raise ValueError("DOL workbook exceeds the uncompressed size limit")
+            if (not {"[Content_Types].xml", "xl/workbook.xml"}.issubset(names)
+                    or not any(re.fullmatch(r"xl/worksheets/sheet\d+\.xml", name) for name in names)):
+                raise ValueError("DOL response was not a valid XLSX workbook")
+            if check_crc and archive.testzip() is not None:
+                raise ValueError("DOL workbook contains corrupt ZIP data")
+    except (zipfile.BadZipFile, EOFError) as error:
+        raise ValueError("DOL response was not a valid XLSX workbook") from error
 
 
 def numeric(value):
@@ -105,6 +147,7 @@ def cell_value(cell, strings):
 
 
 def disclosure_rows(path):
+    validate_workbook(path)
     with zipfile.ZipFile(path) as archive:
         strings = shared_strings(archive)
         worksheet = next(name for name in archive.namelist()
@@ -113,27 +156,38 @@ def disclosure_rows(path):
             events = ET.iterparse(stream, events=("start", "end"))
             _, root = next(events)
             mapping = None
+            source_rows = 0
             for event, element in events:
                 if event != "end" or element.tag != NS + "row":
                     continue
                 cells = list(element)
                 if mapping is None:
-                    headers = {column_number(c.get("r", "")): cell_value(c, strings)
-                               for c in cells}
+                    header_cells = [(column_number(c.get("r", "")), cell_value(c, strings))
+                                    for c in cells]
+                    headers = dict(header_cells)
                     if "CASE_NUMBER" not in headers.values():
                         element.clear()
+                        root.clear()
                         continue
-                    missing = {"CASE_NUMBER", "EMPLOYER_NAME", "CASE_STATUS",
-                               "VISA_CLASS", "WAGE_RATE_OF_PAY_FROM"} - set(headers.values())
+                    if (len(headers) != len(header_cells)
+                            or any(count > 1 for name, count in Counter(headers.values()).items()
+                                   if name in FIELDS)):
+                        raise ValueError("Unsupported DOL schema: duplicate header columns")
+                    missing = FIELDS - set(headers.values())
                     if missing:
                         raise ValueError(f"Unsupported DOL schema: missing {sorted(missing)}")
                     mapping = {i: h for i, h in headers.items() if h in FIELDS}
                     print(f"Reading {path.name}: {len(headers)} columns", flush=True)
                 else:
+                    source_rows += 1
+                    if source_rows > MAX_SOURCE_ROWS:
+                        raise ValueError("DOL workbook exceeds the source row limit")
                     yield {mapping[i]: cell_value(c, strings) for c in cells
                            if (i := column_number(c.get("r", ""))) in mapping}
                 element.clear()
                 root.clear()
+            if mapping is None:
+                raise ValueError("Unsupported DOL schema: no disclosure header found")
 
 
 def petition_type(raw):
@@ -154,31 +208,73 @@ def normalize(raw):
     wage = annual_wage(raw.get("WAGE_RATE_OF_PAY_FROM"), raw.get("WAGE_UNIT_OF_PAY"))
     if not employer or not raw.get("CASE_NUMBER") or wage is None or not 5000 <= wage <= 1000000:
         return None
+    if raw.get("FULL_TIME_POSITION") not in {"Y", "N"}:
+        raise ValueError("Unsupported DOL data: FULL_TIME_POSITION must be Y or N")
     values = [raw["CASE_NUMBER"], raw.get("JOB_TITLE", ""), raw.get("SOC_CODE", ""),
               raw.get("WORKSITE_CITY", ""), raw.get("WORKSITE_STATE", ""), wage,
               annual_wage(raw.get("WAGE_RATE_OF_PAY_TO"), raw.get("WAGE_UNIT_OF_PAY")),
               annual_wage(raw.get("PREVAILING_WAGE"), raw.get("PW_UNIT_OF_PAY")),
               raw.get("PW_WAGE_LEVEL", ""), iso_date(raw.get("RECEIVED_DATE")),
               iso_date(raw.get("DECISION_DATE")), iso_date(raw.get("BEGIN_DATE")),
-              raw.get("FULL_TIME_POSITION") == "Y", petition_type(raw), "Certified"]
+              raw["FULL_TIME_POSITION"] == "Y", petition_type(raw), "Certified"]
     return employer, values, str(raw.get("NAICS_CODE", ""))[:2]
 
 
 def download(url, archive_dir, refresh=False):
-    filename = url.split("/")[-1].split("?")[0]
+    url = dol_source.canonical_dol_url(url)
+    filename = urlsplit(url).path.rsplit("/", 1)[-1]
     if not filename.lower().endswith(".xlsx"):
         raise ValueError("Source URL must name an XLSX disclosure file")
+    archive_dir = Path(archive_dir)
+    archive_dir.mkdir(parents=True, exist_ok=True)
     path = archive_dir / filename
-    if not refresh and path.exists() and zipfile.is_zipfile(path):
-        return path
-    request = urllib.request.Request(url, headers={"User-Agent": "GreenCardTimer public-data refresh/1.0"})
+    if not refresh and path.exists():
+        try:
+            validate_workbook(path)
+            return path
+        except ValueError:
+            pass
     temporary = path.with_suffix(".part")
-    with urllib.request.urlopen(request, timeout=180) as response, temporary.open("wb") as output:
-        while chunk := response.read(1024 * 1024):
-            output.write(chunk)
-    if not zipfile.is_zipfile(temporary):
-        raise ValueError("DOL response was not a valid XLSX file")
-    temporary.replace(path)
+    deadline = time.monotonic() + MAX_DOWNLOAD_SECONDS
+    try:
+        with dol_source.open_dol_url(url, timeout=MAX_DOWNLOAD_SECONDS) as response:
+            if dol_source.canonical_dol_url(response.geturl()) != url:
+                raise ValueError("DOL workbook redirected to a different source file")
+            length = response.headers.get("Content-Length")
+            declared_bytes = None
+            if length is not None:
+                try:
+                    declared_bytes = int(length)
+                except ValueError as error:
+                    raise ValueError("DOL workbook has an invalid Content-Length") from error
+                if declared_bytes < 0 or declared_bytes > MAX_DOWNLOAD_BYTES:
+                    raise ValueError("DOL workbook exceeds the download size limit")
+            downloaded = 0
+            with temporary.open("wb") as output:
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("DOL workbook download exceeded its time limit")
+                    # urllib's socket timeout is per read; reduce it to the
+                    # remaining budget so a late read cannot restart the clock.
+                    socket = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+                    if socket is not None:
+                        socket.settimeout(remaining)
+                    chunk = getattr(response, "read1", response.read)(1024 * 1024)
+                    if time.monotonic() > deadline:
+                        raise TimeoutError("DOL workbook download exceeded its time limit")
+                    if not chunk:
+                        break
+                    downloaded += len(chunk)
+                    if downloaded > MAX_DOWNLOAD_BYTES:
+                        raise ValueError("DOL workbook exceeds the download size limit")
+                    output.write(chunk)
+            if declared_bytes is not None and downloaded != declared_bytes:
+                raise ValueError("DOL workbook download was truncated")
+        validate_workbook(temporary, check_crc=True)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return path
 
 
@@ -206,6 +302,8 @@ def main():
     parser.add_argument("--refresh", action="store_true", help="Re-download cached source files, including corrected releases")
     parser.add_argument("--rich-index", action="store_true", help="Include titles, industry and activity scores in the larger employer index")
     args = parser.parse_args()
+    if args.max_rows is not None and not 1 <= args.max_rows <= MAX_SOURCE_ROWS:
+        parser.error(f"--max-rows must be between 1 and {MAX_SOURCE_ROWS}")
     archive_dir = Path(args.archive_dir)
     output_dir = Path(args.output_dir)
     archive_dir.mkdir(parents=True, exist_ok=True)
@@ -214,13 +312,16 @@ def main():
     latest_decisions = {}
     sources = []
     input_rows = 0
-    for url in args.source or [DEFAULT_URL]:
-        if urlparse(url).hostname not in ("www.dol.gov", "dol.gov"):
-            raise ValueError("Only official dol.gov disclosure URLs are accepted")
+    source_rows = 0
+    for url in args.source or [default_source()]:
+        url = dol_source.canonical_dol_url(url)
         path = download(url, archive_dir, args.refresh)
         sources.append({"name": "DOL OFLC LCA public disclosure", "url": url,
                         "filename": path.name, "sha256": file_hash(path), "bytes": path.stat().st_size})
         for raw in disclosure_rows(path):
+            source_rows += 1
+            if source_rows > MAX_SOURCE_ROWS:
+                raise ValueError("DOL ingestion exceeds the source row limit")
             if not raw.get("CASE_NUMBER"):
                 continue
             input_rows += 1
@@ -286,17 +387,19 @@ def main():
              "employerRows": [[employer[column] for column in employer_columns] for employer in summaries]}
     if args.rich_index:
         index["scoreMethod"] = "Activity score: up to 40 points from log10(filings+1)*10, 25 from distinct titles*2.5, 20 from distinct states*4, and 15 from full-time filing share. Not a visa approval or sponsorship guarantee."
-    for prefix, employers in shards.items():
+    prefixes = {f"{value:02x}" for value in range(256)}
+    for prefix in sorted(prefixes):
+        employers = shards.get(prefix, {})
         write_json(output_dir / "career" / f"{prefix}.json", {"columns": COLUMNS, "employers": employers})
     for path in (output_dir / "career").glob("*.json"):
-        if path.stem not in shards:
+        if path.stem not in prefixes:
             path.unlink()
     write_json(output_dir / "career-index.json", index)
     import resource
     peak_memory = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     if sys.platform != "darwin":
         peak_memory *= 1024
-    print(json.dumps({"records": len(records), "employers": len(summaries), "shards": len(shards),
+    print(json.dumps({"records": len(records), "employers": len(summaries), "shards": len(prefixes),
                       "indexBytes": (output_dir / "career-index.json").stat().st_size,
                       "totalBytes": sum(p.stat().st_size for p in (output_dir / "career").glob("*.json")),
                       "elapsedSeconds": round(time.monotonic() - started, 2), "peakResidentBytes": peak_memory,

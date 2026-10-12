@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "fiscalYear": 2026,
+  "quarter": 3,
+  "sourcePage": "https://www.dol.gov/agencies/eta/foreign-labor/performance",
+  "source": {
+    "url": "https://www.dol.gov//media/LCA_Disclosure_Data_FY2026_Q3.xlsx",
+    "filename": "LCA_Disclosure_Data_FY2026_Q3.xlsx",
+    "sha256": "f8ca8448a528671f784d3692923775a13741c99caec2816b2fe30c8885bd28b3",
+    "bytes": 251850891
+  },
+  "archive": {
+    "url": "https://github.com/prateekrsrivastava-d65websites/greencardtimer/releases/download/dol-fy2026-q3/career-fy2026-q3.tar.gz",
+    "sha256": "441175780e4353549243b96feaa94c6f2aeb6be5500011a78b2022d02f65f724"
+  },
+  "records": 391764,
+  "employers": 53787
+}

@@ -15,7 +15,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,6 +31,11 @@ jobs:
       - run: npm run refresh:processing
         id: processing
         continue-on-error: true
+      - run: npm run refresh:employers -- --publish
+        id: employers
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
       - run: npm run prepare:career
       - run: npm test
       - run: npm run build
@@ -38,11 +43,14 @@ jobs:
         env:
           BULLETINS_OUTCOME: ${{ steps.bulletins.outcome }}
           PROCESSING_OUTCOME: ${{ steps.processing.outcome }}
+          EMPLOYERS_OUTCOME: ${{ steps.employers.outcome }}
+          EMPLOYERS_STATUS: ${{ steps.employers.outputs.status }}
         run: |
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs';
           const bulletins = JSON.parse(readFileSync('public/data/bulletins.json', 'utf8'));
           const processing = JSON.parse(readFileSync('public/data/processing.json', 'utf8'));
+          const career = JSON.parse(readFileSync('data/career-release.json', 'utf8'));
           const latest = bulletins.bulletins.find(bulletin => bulletin.month === bulletins.latestMonth);
           const outcome = value => value === 'success' ? 'success; official source validated' : `${value || 'not run'}; last verified snapshot retained`;
           const lines = [
@@ -61,6 +69,14 @@ jobs:
             `Snapshot verified: ${processing.verifiedAt}`,
             `Successful-check record: ${processing.refresh?.checkedAt ?? 'Not recorded'}`,
             `Source: ${processing.sourceUrl}`, '',
+            '### Published Employer / Salary Snapshot', '',
+            `Employer updater: ${outcome(process.env.EMPLOYERS_OUTCOME)}`,
+            `Result: ${process.env.EMPLOYERS_STATUS || 'Last verified snapshot retained'}`,
+            `Release: FY${career.fiscalYear} Q${career.quarter}`,
+            `Certified H-1B cases: ${career.records}; employers: ${career.employers}`,
+            `Source: ${career.source.url}`,
+            `Workbook SHA-256: ${career.source.sha256}`,
+            `Verified static archive: ${career.archive.url}`, '',
             'Updater outcomes are separate from the retained snapshot dates. Failed sources preserve their last good data; independently valid updates can still publish before the job reports a source failure.',
             'Unchanged published files create no commit. Successful-check records are distinct from data verification dates.', '',
           ];
@@ -68,7 +84,10 @@ jobs:
           NODE
       - name: Commit Only Changed, Validated Data
         run: |
-          git add -- public/data/bulletins.json public/data/model.json public/data/processing.json
+          git add -- public/data/bulletins.json public/data/model.json public/data/processing.json data/career-release.json
+          if test -f data/career-source-check.json; then
+            git add -- data/career-source-check.json
+          fi
           if git diff --cached --quiet; then
             echo "Official tables unchanged; no commit."
             exit 0
@@ -78,7 +97,7 @@ jobs:
           git commit -m "data: refresh official immigration data"
           git push origin HEAD:main
       - name: Report Any Source Failure
-        if: steps.bulletins.outcome == 'failure' || steps.processing.outcome == 'failure'
+        if: steps.bulletins.outcome == 'failure' || steps.processing.outcome == 'failure' || steps.employers.outcome == 'failure'
         run: |
           echo "A source refresh failed. Last good data was preserved; independent valid updates were still published."
           exit 1
