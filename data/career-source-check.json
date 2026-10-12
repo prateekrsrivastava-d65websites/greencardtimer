@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "url": "https://www.dol.gov/media/LCA_Disclosure_Data_FY2026_Q3.xlsx",
+  "sourceSha256": "f8ca8448a528671f784d3692923775a13741c99caec2816b2fe30c8885bd28b3",
+  "validators": {
+    "etag": "\"632dc912460c7de8c85ba2f7bd82110a:1786124010.421584\"",
+    "lastModified": "Fri, 07 Aug 2026 17:33:30 GMT",
+    "bytes": 251850891
+  }
+}
