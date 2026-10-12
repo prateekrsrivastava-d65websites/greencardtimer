@@ -1,8 +1,39 @@
+import { parseDate } from './model.js';
+
 const indexCache = new Map();
 const shardCache = new Map();
 const normalize = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
 const validWages = (rows) => rows.map((row) => Number(row.wage)).filter((wage) => Number.isFinite(wage) && wage > 0).sort((a, b) => a - b);
 const rowsOf = (dataset) => Array.isArray(dataset) ? dataset : dataset?.rows ?? [];
+export const STATIC_EMPLOYER_LIMIT = 500;
+
+export function employerProfilePath(employer) {
+  if (!/^[a-f0-9]{16}$/.test(String(employer?.id)) || !String(employer?.name ?? '').trim()) return null;
+  const slug = String(employer.name).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80).replace(/-$/, '') || 'employer';
+  return `/employers/${slug}--${employer.id}/`;
+}
+
+export function employerIdFromPath(pathname) {
+  return /^\/employers\/[a-z0-9]+(?:-[a-z0-9]+)*--([a-f0-9]{16})\/?$/.exec(String(pathname))?.[1] ?? null;
+}
+
+export function employerSalaryPath(id) {
+  return /^[a-f0-9]{16}$/.test(String(id)) ? `/salary-data/?employer=${id}` : null;
+}
+
+export function employerIdFromSearch(search) {
+  const params = new URLSearchParams(search);
+  const ids = params.getAll('employer');
+  return ids.length === 1 && employerSalaryPath(ids[0]) ? ids[0] : null;
+}
+
+export function selectStaticEmployers(dataset, limit = STATIC_EMPLOYER_LIMIT) {
+  const requested = Number(limit);
+  const count = Number.isFinite(requested) ? Math.max(0, Math.min(STATIC_EMPLOYER_LIMIT, Math.floor(requested))) : STATIC_EMPLOYER_LIMIT;
+  return [...(dataset?.employers ?? [])].filter(employer => employerProfilePath(employer) && employer.filings > 0)
+    .sort((a, b) => b.filings - a.filings || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)).slice(0, count);
+}
 
 function quantile(sorted, fraction) {
   if (!sorted.length) return null;
@@ -147,6 +178,45 @@ export function summarizeEmployer(name, dataset = {}) {
     states: [...new Set(rows.map((row) => row.state).filter(Boolean))],
     topTitles: [...titles].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([title]) => title),
     lastFiled: rows.map((row) => row.date).sort().at(-1),
+  };
+}
+
+function groupedWages(rows, fields, limit = Infinity) {
+  const groups = new Map();
+  for (const row of rows) {
+    const labels = fields.map(field => String(row[field] ?? '').trim().replace(/\s+/g, ' '));
+    if (labels.some(label => !label)) continue;
+    const key = JSON.stringify(labels);
+    if (!groups.has(key)) groups.set(key, { labels, rows: [] });
+    groups.get(key).rows.push(row);
+  }
+  return [...groups.values()].sort((a, b) => b.rows.length - a.rows.length || a.labels.join(' ').localeCompare(b.labels.join(' ')))
+    .slice(0, limit).map(group => ({
+      ...Object.fromEntries(fields.map((field, i) => [field, group.labels[i]])),
+      filings: group.rows.length, wages: wageStats(group.rows),
+    }));
+}
+
+export function buildEmployerProfile(dataset = {}) {
+  const employer = dataset.employer;
+  const path = employerProfilePath(employer);
+  if (!path) return null;
+  const rows = rowsOf(dataset).filter(row => row.status === 'Certified'
+    && normalize(row.employer ?? employer.name) === normalize(employer.name));
+  const filedDates = rows.map(row => row.date).filter(value => parseDate(value)).sort();
+  const decisionDates = rows.map(row => row.decisionDate).filter(value => parseDate(value)).sort();
+  const months = new Map();
+  for (const date of filedDates) months.set(date.slice(0, 7), (months.get(date.slice(0, 7)) ?? 0) + 1);
+  const fullTime = rows.filter(row => row.fullTime === true).length;
+  const partTime = rows.filter(row => row.fullTime === false).length;
+  return {
+    id: employer.id, name: employer.name, path, filings: rows.length, wages: wageStats(rows),
+    firstFiled: filedDates[0] ?? null, lastFiled: filedDates.at(-1) ?? null, lastDecision: decisionDates.at(-1) ?? null,
+    fullTimeCounts: { fullTime, partTime, unknown: rows.length - fullTime - partTime },
+    topTitles: groupedWages(rows, ['title'], 10), worksiteStates: groupedWages(rows, ['state']),
+    topWorksites: groupedWages(rows, ['city', 'state'], 10),
+    filingMonths: [...months].sort(([a], [b]) => a.localeCompare(b)).map(([month, filings]) => ({ month, filings })),
+    scope: dataset.scope, sources: dataset.sources ?? [], generatedAt: dataset.generatedAt,
   };
 }
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { searchCareer, summarizeEmployer, benchmarkOffer, searchSponsors, autocompleteEmployers, careerRowsToCsv, loadCareerRows, decodeCareerIndex } from '../src/career.js';
+import { searchCareer, summarizeEmployer, benchmarkOffer, searchSponsors, autocompleteEmployers, careerRowsToCsv, loadCareerRows, decodeCareerIndex, buildEmployerProfile, employerProfilePath, employerIdFromPath, employerSalaryPath, employerIdFromSearch, selectStaticEmployers, STATIC_EMPLOYER_LIMIT } from '../src/career.js';
 
 const rows = [
   { id: 'a', employer: 'Example Inc.', title: 'Software Engineer', soc: '15-1252', state: 'CA', city: 'Sunnyvale', wage: 100000, prevailingWage: 90000, date: '2026-01-01', fullTime: true, petitionType: 'New employment' },
@@ -65,6 +65,96 @@ test('CSV escapes commas, quotation marks and formula prefixes', () => {
   const csv = careerRowsToCsv([{ employer: '=VALUE("x")', title: 'Role, senior' }]);
   assert.match(csv, /"'=VALUE\(""x""\)"/);
   assert.match(csv, /"Role, senior"/);
+});
+
+test('employer profile paths are safe, readable and collision-resistant', () => {
+  const employer = { id: 'abcdef0123456789', name: 'EXAMPLE, INC. / R&D' };
+  const path = employerProfilePath(employer);
+  assert.equal(path, '/employers/example-inc-r-d--abcdef0123456789/');
+  assert.equal(employerIdFromPath(path), employer.id);
+  assert.equal(employerIdFromPath(path.slice(0, -1)), employer.id);
+  assert.notEqual(employerProfilePath({ ...employer, id: '1234567890abcdef' }), path);
+  assert.match(employerProfilePath({ ...employer, name: '\u00c9xample LLC' }), /^\/employers\/example-llc--/);
+  assert.match(employerProfilePath({ ...employer, name: '\u4f01\u4e1a' }), /^\/employers\/employer--/);
+  assert.ok(employerProfilePath({ ...employer, name: 'a'.repeat(200) }).split('--')[0].length <= '/employers/'.length + 80);
+  assert.equal(employerProfilePath({ ...employer, id: '../../escape' }), null);
+  assert.equal(employerProfilePath({ ...employer, name: '' }), null);
+  for (const invalid of ['/employers/', '/employers/../example--abcdef0123456789/', `${path}?id=other`, '/employers/x--ABCDEF0123456789/', '/salary-data/']) {
+    assert.equal(employerIdFromPath(invalid), null);
+  }
+});
+
+test('salary links preserve a validated employer selection across new tabs and reloads', () => {
+  const id = 'abcdef0123456789';
+  assert.equal(employerSalaryPath(id), `/salary-data/?employer=${id}`);
+  assert.equal(employerIdFromSearch(new URL(employerSalaryPath(id), 'https://timer.example').search), id);
+  for (const invalid of ['', '?employer=../escape', '?employer=ABCDEF0123456789', `?employer=${id}&employer=${id}`]) {
+    assert.equal(employerIdFromSearch(invalid), null);
+  }
+  assert.equal(employerSalaryPath('invalid'), null);
+});
+
+test('static employer selection ranks disclosed volume without scores and respects its page cap', () => {
+  const employers = Array.from({ length: 600 }, (_, i) => ({ id: i.toString(16).padStart(16, '0'), name: `Employer ${i}`, filings: i + 1, score: 1000 - i }));
+  const dataset = { employers };
+  assert.equal(selectStaticEmployers(dataset, 10000).length, STATIC_EMPLOYER_LIMIT);
+  assert.equal(selectStaticEmployers(dataset)[0].filings, 600);
+  assert.equal(selectStaticEmployers(dataset, 0).length, 0);
+  assert.equal(selectStaticEmployers(dataset, 2.9).length, 2);
+  assert.equal(employers[0].filings, 1);
+  const ties = { employers: [{ ...employers[0], name: 'Z', filings: 2 }, { ...employers[1], name: 'A', filings: 2 }] };
+  assert.equal(selectStaticEmployers(ties)[0].name, 'A');
+});
+
+test('employer profile aggregates certified disclosed cases and carries coverage without approval claims', () => {
+  const employer = { id: 'abcdef0123456789', name: 'Example Inc.', filings: 3, score: 99 };
+  const data = {
+    employer, rows: [
+      ...rows.map(row => ({ ...row, status: 'Certified', decisionDate: '2026-04-01' })),
+      { ...rows[0], status: 'Denied', date: '2025-01-01' },
+      { ...rows[0], status: 'Certified', employer: 'Other LLC' },
+    ],
+    scope: { label: 'FY2026_Q3' }, sources: [{ url: 'https://www.dol.gov/official.xlsx' }], generatedAt: '2026-10-11T00:00:00Z',
+  };
+  const original = structuredClone(data);
+  const profile = buildEmployerProfile(data);
+  assert.equal(profile.path, employerProfilePath(employer));
+  assert.equal(profile.filings, 3);
+  assert.equal(profile.wages.median, 200000);
+  assert.equal(profile.wages.p25, 150000);
+  assert.equal(profile.wages.p75, 250000);
+  assert.equal(profile.firstFiled, '2026-01-01');
+  assert.equal(profile.lastFiled, '2026-03-01');
+  assert.equal(profile.lastDecision, '2026-04-01');
+  assert.deepEqual(profile.fullTimeCounts, { fullTime: 2, partTime: 1, unknown: 0 });
+  assert.equal(profile.topTitles[0].title, 'Software Engineer');
+  assert.equal(profile.topTitles[0].filings, 2);
+  assert.equal(profile.topTitles[0].wages.median, 150000);
+  assert.equal(profile.worksiteStates[0].state, 'CA');
+  assert.equal(profile.topWorksites[0].city, 'Sunnyvale');
+  assert.deepEqual(profile.filingMonths, [{ month: '2026-01', filings: 1 }, { month: '2026-02', filings: 1 }, { month: '2026-03', filings: 1 }]);
+  assert.deepEqual(profile.scope, data.scope);
+  assert.deepEqual(profile.sources, data.sources);
+  assert.equal(profile.generatedAt, data.generatedAt);
+  for (const field of ['score', 'approvalRate', 'reliabilityScore', 'greenCardSponsorship']) assert.equal(Object.hasOwn(profile, field), false);
+  assert.deepEqual(data, original);
+});
+
+test('employer profiles preserve unknown schedule and missing dates without guessing', () => {
+  const profile = buildEmployerProfile({
+    employer: { id: 'abcdef0123456789', name: 'Example' },
+    rows: [{ id: 'case', status: 'Certified', wage: 100000, date: '2026-02-30' }],
+  });
+  assert.equal(profile.filings, 1);
+  assert.deepEqual(profile.fullTimeCounts, { fullTime: 0, partTime: 0, unknown: 1 });
+  assert.equal(profile.firstFiled, null);
+  assert.equal(profile.lastFiled, null);
+  assert.equal(profile.lastDecision, null);
+  assert.deepEqual(profile.filingMonths, []);
+  assert.deepEqual(profile.topTitles, []);
+  assert.deepEqual(profile.worksiteStates, []);
+  assert.deepEqual(profile.topWorksites, []);
+  assert.equal(buildEmployerProfile(), null);
 });
 
 const publishedIndex = new URL('../public/data/career-index.json', import.meta.url);

@@ -1,4 +1,4 @@
-name: Refresh Official Bulletins
+name: Refresh Official Immigration Data
 
 on:
   schedule:
@@ -26,20 +26,59 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run refresh:bulletins
+        id: bulletins
+        continue-on-error: true
+      - run: npm run refresh:processing
+        id: processing
+        continue-on-error: true
       - run: npm run prepare:career
       - run: npm test
       - run: npm run build
       - name: Refresh Summary
+        env:
+          BULLETINS_OUTCOME: ${{ steps.bulletins.outcome }}
+          PROCESSING_OUTCOME: ${{ steps.processing.outcome }}
         run: |
-          node --input-type=module -e 'import { readFileSync } from "node:fs"; import { appendFileSync } from "node:fs"; const data = JSON.parse(readFileSync("public/data/bulletins.json", "utf8")); appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Official bulletin check\n\nLatest edition: ${data.latestMonth}\n\nSuccessful check record: ${data.refresh.checkedAt}\n\nRetrieval: ${data.refresh.latestRetrievedFrom}\n\nAll four employment/family tables, all 100 tracked cells, monthly continuity, tests and build passed. Unchanged weekly checks do not create commits.\n`);'
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const bulletins = JSON.parse(readFileSync('public/data/bulletins.json', 'utf8'));
+          const processing = JSON.parse(readFileSync('public/data/processing.json', 'utf8'));
+          const latest = bulletins.bulletins.find(bulletin => bulletin.month === bulletins.latestMonth);
+          const outcome = value => value === 'success' ? 'success; official source validated' : `${value || 'not run'}; last verified snapshot retained`;
+          const lines = [
+            '## Official Immigration Data Check', '',
+            `Bulletin updater: ${outcome(process.env.BULLETINS_OUTCOME)}`,
+            `PERM/PWD updater: ${outcome(process.env.PROCESSING_OUTCOME)}`, '',
+            '### Published Bulletin Snapshot', '',
+            `Latest edition: ${bulletins.latestMonth}`,
+            `Snapshot verified: ${latest?.verifiedAt ?? bulletins.generatedAt}`,
+            `Successful-check record: ${bulletins.refresh?.checkedAt ?? 'Not recorded'}`,
+            `Retrieval: ${bulletins.refresh?.latestRetrievedFrom ?? latest?.sourceUrl ?? 'Not recorded'}`, '',
+            'All four employment/family tables, all 100 tracked cells and monthly continuity passed validation; tests and build passed.', '',
+            '### Published PERM/PWD Snapshot', '',
+            `PERM source as of: ${processing.current.perm.asOf}`,
+            `PWD source as of: ${processing.current.pwd.asOf}`,
+            `Snapshot verified: ${processing.verifiedAt}`,
+            `Successful-check record: ${processing.refresh?.checkedAt ?? 'Not recorded'}`,
+            `Source: ${processing.sourceUrl}`, '',
+            'Updater outcomes are separate from the retained snapshot dates. Failed sources preserve their last good data; independently valid updates can still publish before the job reports a source failure.',
+            'Unchanged published files create no commit. Successful-check records are distinct from data verification dates.', '',
+          ];
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
       - name: Commit Only Changed, Validated Data
         run: |
-          git add -- public/data/bulletins.json public/data/model.json
+          git add -- public/data/bulletins.json public/data/model.json public/data/processing.json
           if git diff --cached --quiet; then
             echo "Official tables unchanged; no commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "data: refresh official visa bulletins"
+          git commit -m "data: refresh official immigration data"
           git push origin HEAD:main
+      - name: Report Any Source Failure
+        if: steps.bulletins.outcome == 'failure' || steps.processing.outcome == 'failure'
+        run: |
+          echo "A source refresh failed. Last good data was preserved; independent valid updates were still published."
+          exit 1

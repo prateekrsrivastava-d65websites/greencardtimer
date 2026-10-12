@@ -11,6 +11,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test test/*.test.mjs && python3 -m unittest discover -s test -p 'test_*.py'",
     "refresh:bulletins": "node scripts/refresh-bulletins.mjs",
+    "refresh:processing": "node scripts/refresh-processing.mjs",
     "prepare:career": "python3 scripts/prepare-career.py",
     "ingest:dol": "python3 scripts/ingest-dol.py --archive-dir .cache/dol"
   },
