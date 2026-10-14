@@ -11,7 +11,7 @@ const savedProfile = { country: 'India', category: 'EB2', priorityDate: '2017-04
 
 async function browserHarness({ route = '/', search = '', saved = [], failData = false, homePanels = '' } = {}) {
   let $ = load(`<main id="main" data-published-route="/"><table><tr><td>Published cutoffs</td></tr></table></main>${homePanels}`), version = 0, total = 10;
-  const requests = [], listeners = {}, observers = [], storage = new Map([['gct.profiles', JSON.stringify(saved)]]);
+  const requests = [], listeners = {}, observers = [], revealed = [], storage = new Map([['gct.profiles', JSON.stringify(saved)]]);
   const location = { pathname: route, search, origin: 'https://example.test' };
   const summary = () => ({
     status: 'ready', total, window: { from: '2026-09-13', through: '2026-10-12', days: 30 },
@@ -41,6 +41,8 @@ async function browserHarness({ route = '/', search = '', saved = [], failData =
       setCustomValidity(message) { node.validationMessage = message; },
       reportValidity: () => !$(node).find('input').toArray().some(field => field.validationMessage),
       getBoundingClientRect: () => ({ width: 400 }),
+      focus(options) { revealed.push({ id: node.attribs?.id, action: 'focus', options }); },
+      scrollIntoView(options) { revealed.push({ id: node.attribs?.id, action: 'scroll', options }); },
       replaceChildren: content => $(node).html(content),
       remove: () => $(node).remove(),
       insertAdjacentHTML(position, content) { position === 'afterbegin' ? $(node).prepend(content) : $(node).append(content); },
@@ -90,7 +92,7 @@ async function browserHarness({ route = '/', search = '', saved = [], failData =
   const settle = async () => { await new Promise(resolve => setImmediate(resolve)); };
   await settle();
   const trigger = async (type, selector) => { const event = { target: document.querySelector(selector), preventDefault() {}, button: 0 }; for (const listener of listeners[type] || []) await listener(event); await settle(); };
-  return { app: app.namespace, html: () => load(main.innerHTML), document, location, requests, observers, trigger, settle };
+  return { app: app.namespace, html: () => load(main.innerHTML), document, location, requests, observers, revealed, trigger, settle };
 }
 
 function assertCommunity($, beside) {
@@ -139,6 +141,7 @@ test('priority-date workspace switches community and results without changing re
   assert.equal(published.html()('.workspace > .results').length, 1);
   assert.equal(published.requests.filter(request => request.url.startsWith('/data/')).length, 2);
   assert.equal(published.requests.filter(request => request.options?.method === 'POST').length, 1);
+  assert.deepEqual(published.revealed.map(event => `${event.id}:${event.action}`), ['timeline-result:focus', 'timeline-result:scroll']);
 
   const invalid = await browserHarness();
   invalid.document.querySelector('#priority-date').value = '02-29-2025';
@@ -148,6 +151,7 @@ test('priority-date workspace switches community and results without changing re
   assert.equal(invalid.html()('.results').length, 0);
   assertCommunity(invalid.html(), true);
   assert.equal(invalid.requests.filter(request => request.options?.method === 'POST').length, 0);
+  assert.equal(invalid.revealed.length, 0);
   await invalid.trigger('click', '[data-chart="filing"]');
   assert.equal(invalid.html()('[data-chart="filing"]').attr('aria-pressed'), 'true');
   assert.equal(invalid.html()('#priority-date').val(), '02-29-2025');
@@ -211,8 +215,9 @@ test('priority-date workspace switches community and results without changing re
     assertCommunity(shared.html(), false);
     assert.equal(shared.requests.filter(request => request.options?.method === 'POST').length, 0);
     const result = shared.html();
-    assert.deepEqual(result('.results .metric-label').map((_, element) => result(element).text()).get(), ['Final action cutoff', 'Your priority date', 'Monthly cutoff movement']);
+    assert.deepEqual(result('.results .metric-label').map((_, element) => result(element).text()).get(), ['Final action cutoff', 'Your priority date', category === 'F2A' ? 'Monthly cutoff movement' : 'Calendar gap']);
     assert.equal(result('.results .metric-value').eq(1).text(), category === 'EB1' ? 'Apr 15, 2026' : 'Apr 21, 2017');
+    if (category !== 'F2A') assert.match(result('.results .metric-sub').eq(2).text(), /not wait time/);
     assert.match(result('.approval-note').text(), /does not predict your approval date or remaining wait/);
     assert.equal(result('.result-source a').attr('href'), bulletinData.bulletins.find(bulletin => bulletin.month === bulletinData.latestMonth).sourceUrl);
     assert.match(result('.result-source').text(), /Snapshot verified/);

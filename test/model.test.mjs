@@ -179,6 +179,15 @@ test('April 2026 India EB-1 dates show actual cutoffs and history, never a calen
   }
 });
 
+test('January 2026 India EB-1 compares correctly with the published October 2026 bulletin', () => {
+  const result = evaluateProfile({ ...profile, category: 'EB1', priorityDate: '2026-01-01', chart: 'finalAction' }, productionBulletinData, modelData);
+  assert.equal(result.status, 'waiting');
+  assert.equal(result.finalActionCutoff, '2023-02-01');
+  assert.equal(result.filingCutoff, '2024-07-01');
+  assert.ok(result.monthsBehind > 34 && result.monthsBehind < 36);
+  assert.equal(result.scenarios, null);
+});
+
 test('production bulletins retain twenty-five contiguous months and one hundred complete tracked cells', () => {
   assert.equal(productionBulletinData.bulletins.length, 25);
   assert.equal(productionBulletinData.bulletins[0].month, productionBulletinData.latestMonth);
