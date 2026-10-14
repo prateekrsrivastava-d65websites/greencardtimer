@@ -60,8 +60,10 @@ export function structuredData(route, origin, { careerData, employerProfile } = 
     const dataset = {
       '@type': 'Dataset', '@id': `${url}#dataset`, url,
       name: `${employerProfile ? `${employerProfile.name} ` : ''}Certified H-1B LCA filings and annualized base wages, ${release(data.scope)}`,
-      description: `${route.description} Derived from public Department of Labor disclosures; certified cases are not unique workers, open jobs, visa approvals or proof of green-card sponsorship.`,
+      description: `${route.description} Source case disclosures created by the U.S. Department of Labor; Green Card Timer filters, annualizes and summarizes these public records. Certified cases are not unique workers, open jobs, visa approvals or proof of green-card sponsorship.`,
       isBasedOn: source, isAccessibleForFree: true, version: data.scope.label,
+      creator: { '@type': 'Organization', name: 'U.S. Department of Labor', url: 'https://www.dol.gov/' },
+      license: 'https://www.dol.gov/general/aboutdol/copyright',
       variableMeasured: ['Certified LCA cases', 'Annualized base wage', 'Reported job title', 'Primary worksite'],
     };
     if (/^\d{4}-\d{2}-\d{2}$/.test(data.scope.decisionFrom) && /^\d{4}-\d{2}-\d{2}$/.test(data.scope.decisionTo)) dataset.temporalCoverage = `${data.scope.decisionFrom}/${data.scope.decisionTo}`;

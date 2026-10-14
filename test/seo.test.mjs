@@ -86,7 +86,7 @@ test('employer schema describes a sourced case subset without invented vacancies
   assert.deepEqual(breadcrumbs.map(item => item.position), [1, 2, 3]);
   assert.equal(breadcrumbs[1].item, 'https://timer.example/employers/');
   assert.equal(breadcrumbs[2].name, employerProfile.name);
-  assert.doesNotMatch(JSON.stringify(graph), /JobPosting|ProfilePage|aggregateRating|hiringOrganization|sameAs|license/);
+  assert.doesNotMatch(JSON.stringify(graph), /JobPosting|ProfilePage|aggregateRating|hiringOrganization|sameAs/);
   const html = routeHTML('<html><head></head><body><main id="main"></main></body></html>', route, 'https://timer.example', { employerProfile: { ...employerProfile, id: 'abcdef0123456789', firstFiled: '2026-01-01', lastFiled: '2026-02-01', lastDecision: '2026-02-02', fullTimeCounts: { fullTime: 10, partTime: 0 }, topTitles: [], worksiteStates: [], topWorksites: [], filingMonths: [] } });
   const $ = load(html);
   assert.equal($('img, script:not([type="application/ld+json"])').length, 0);
@@ -94,6 +94,32 @@ test('employer schema describes a sourced case subset without invented vacancies
   assert.equal(JSON.parse(serializeStructuredData(graph))['@graph'][2].itemListElement.at(-1).name, employerProfile.name);
   assert.doesNotMatch(serializeStructuredData(graph), /<\/script>/);
   assert.equal(structuredData(route, null, { employerProfile }), null);
+});
+
+test('salary and employer datasets credit DOL source records and its actual reuse policy', () => {
+  const employerProfile = {
+    ...careerData, name: 'EXAMPLE LLC', path: '/employers/example--abcdef0123456789/', id: 'abcdef0123456789',
+    filings: 10, wages: { median: 150000 }, firstFiled: '2026-01-01', lastFiled: '2026-02-01', lastDecision: '2026-02-02',
+    fullTimeCounts: { fullTime: 10, partTime: 0 }, topTitles: [], worksiteStates: [], topWorksites: [], filingMonths: [],
+  };
+  for (const data of [{ careerData }, { employerProfile }]) {
+    const route = routeMetadata(data.employerProfile?.path ?? '/salary-data/', data);
+    const graph = structuredData(route, 'https://timer.example', data);
+    const dataset = graph['@graph'].find(item => item['@type'] === 'Dataset');
+    assert.deepEqual(dataset.creator, { '@type': 'Organization', name: 'U.S. Department of Labor', url: 'https://www.dol.gov/' });
+    assert.equal(dataset.license, 'https://www.dol.gov/general/aboutdol/copyright');
+    assert.equal(dataset.isBasedOn, careerData.sources[0].url);
+    assert.match(dataset.description, /Source case disclosures created by the U\.S\. Department of Labor/);
+    assert.match(dataset.description, /Green Card Timer filters, annualizes and summarizes/);
+    assert.doesNotMatch(JSON.stringify(dataset), /creativecommons|CC0|government endorsement/);
+    const page = load(routeHTML('<html><head></head><body><main id="main"></main></body></html>', route, 'https://timer.example', data));
+    const staticDataset = JSON.parse(page('#page-schema').text())['@graph'].find(item => item['@type'] === 'Dataset');
+    const { document } = documentFixture();
+    applyPageMetadata(document, route, 'https://timer.example', data);
+    const clientDataset = JSON.parse(document.querySelector('#page-schema').textContent)['@graph'].find(item => item['@type'] === 'Dataset');
+    assert.deepEqual(staticDataset, dataset);
+    assert.deepEqual(clientDataset, dataset);
+  }
 });
 
 test('domain explanations and contextual links are shared with the visible static HTML', () => {
