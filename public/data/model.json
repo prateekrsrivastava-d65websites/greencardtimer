@@ -3,24 +3,21 @@
   "generatedAt": "2026-10-12",
   "bulletinMonth": "2026-10",
   "methodology": {
-    "kind": "historical-cutoff-scenarios",
-    "title": "Historical cutoff pace scenarios",
-    "description": "Each scenario asks when the selected cutoff could pass the priority date if it repeated a pace observed in the published Visa Bulletins. These are illustrations of past movement, not forecasts of visa supply, queue position, filing permission or individual approval.",
+    "kind": "published-cutoff-history",
+    "title": "Published cutoff history",
+    "description": "Compare the entered priority date with the actual published Visa Bulletin cutoff and show past cutoff movement. The distance between dates is not a remaining wait time. No green-card approval dates or remaining wait times are predicted.",
     "parameters": {
-      "rollingWindowMonths": 6,
-      "minimumHistoryMonths": 12,
-      "minimumPositiveWindows": 3,
-      "maximumHorizonMonths": 120
+      "rollingWindowMonths": 6
     },
     "steps": [
       "Use chronological, sourced monthly Final Action Date or Dates for Filing cutoffs for the selected country and category.",
-      "Measure net cutoff movement across every complete six-month window. Include stalls and retrogression. Exclude windows containing Current, Unavailable, missing dates or missing months.",
-      "Use the 25th, 50th and 75th percentiles of those observed net rates for slower, typical and faster pace illustrations. These overlapping windows are not independent probability samples.",
-      "Only show scenarios with at least twelve months of history, three positive complete windows, a dated latest cutoff, and positive overall net movement.",
-      "Advance by the number of whole bulletin months needed for the cutoff to pass, strictly, the entered date. A zero or negative pace has no finite date. Projections beyond ten years have no displayed date."
+      "For a dated cutoff, the entered priority date must be strictly earlier, not equal. Preserve Current (C) and Unavailable (U) as distinct published states.",
+      "Show past monthly cutoff changes, retaining stalls and retrogression rather than converting historical movement into future eligibility or approval dates.",
+      "Measure historical net cutoff movement across complete six-month windows only. Exclude windows containing Current, Unavailable, missing dates or missing months.",
+      "Do not infer a queue position, inventory, spillover, future visa supply, remaining wait time or green-card approval date."
     ],
     "limitations": [
-      "Future movement depends on visa demand, supply, policy and agency decisions and can differ completely from prior movement. Scenarios are not probability bounds.",
+      "Future movement depends on visa demand, supply, policy and agency decisions and can differ completely from prior movement. Historical movement does not predict a remaining wait time or green-card approval date.",
       "No USCIS inventory or I-140 queue is estimated. Approved petitions do not directly equal people or visa demand, and a filing cutoff hides applicants who cannot file.",
       "This dataset does not independently verify USCIS's monthly choice of the filing chart. Check the official USCIS page before filing I-485.",
       "Meeting a Final Action Date removes only the cutoff constraint. It does not establish approval, a reserved visa number, case readiness or a processing duration.",
@@ -30,7 +27,7 @@
       "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
       "https://www.uscis.gov/visabulletininfo"
     ],
-    "familyCategories": "Family-sponsored preference categories show sourced cutoff history only; no dated scenarios or approval forecasts are generated."
+    "familyCategories": "Family-sponsored preference categories show sourced cutoff history only; no remaining wait times or green-card approval dates are predicted."
   },
   "sourceAccess": {
     "verifiedAt": "2026-10-11",

@@ -75,6 +75,56 @@ test('methodology identifies automatic submitted checks and excludes background 
   assert.doesNotMatch($.text(),/100 contributions|groups below 20|Do Not Track|Global Privacy Control|completed UTC days/);
   assert.equal($('a[href="/privacy/"]').length,1);
 });
+
+test('published methodology describes cutoff history without approval or remaining-wait predictions', () => {
+  const route = ROUTES.find(route => route.path === '/methodology/');
+  const $ = load(routeHTML('<html><head></head><body><main id="main"></main></body></html>', route, 'https://timer.example', { bulletinData }));
+  const text = $('#main').text();
+  assert.equal($('h2').filter((_, heading) => $(heading).text() === 'Published Cutoff History').length, 1);
+  assert.match(text, /priority date must be strictly earlier, not equal/);
+  assert.match(text, /actual published cutoff for the selected country, category, chart and month/);
+  assert.match(text, /Current \(C\) means no cutoff; Unavailable \(U\) means no visas authorized/);
+  assert.match(text, /past cutoff movement, including stalls and retrogression/);
+  assert.match(text, /We do not predict a green-card approval date or a remaining wait time/);
+  assert.match(text, /No queue position, inventory, spillover or future visa supply is inferred/);
+  assert.match(text, /routine update check does not make unchanged data newly verified/);
+  assert.doesNotMatch(text, /Historical Pace Scenarios|slower, typical|faster movement|twelve months of history|three positive windows|finite date|ten years|beyond.*horizon/i);
+  const latest = bulletinData.bulletins.find(bulletin => bulletin.month === bulletinData.latestMonth);
+  assert.equal($(`a[href="${latest.sourceUrl}"]`).length, 1);
+  assert.equal($('a[href="https://www.uscis.gov/visabulletininfo"]').length, 1);
+  assert.equal($('a[href="https://www.dol.gov/agencies/eta/foreign-labor/performance"]').length, 1);
+});
+
+test('home static HTML identifies a priority-date tracker, not a wait-time estimator', () => {
+  const $ = load(initialContent(ROUTES.find(route => route.path === '/'), { bulletinData }));
+  assert.equal($('h1').text(), 'Green Card Priority Date Tracker');
+  assert.match($.text(), /checks against published Visa Bulletin cutoffs/);
+  assert.match($.text(), /Past cutoff movement is not a prediction of remaining wait time or a green-card approval date/);
+  assert.doesNotMatch($.text(), /pace scenarios|wait time estimator|slower.*typical.*faster|ten years/i);
+});
+
+test('published model metadata is history-only and keeps sourced historical observations', () => {
+  const model = JSON.parse(readFileSync(new URL('../public/data/model.json', import.meta.url), 'utf8'));
+  const { methodology } = model;
+  assert.equal(methodology.kind, 'published-cutoff-history');
+  assert.equal(methodology.title, 'Published cutoff history');
+  assert.deepEqual(methodology.parameters, { rollingWindowMonths: 6 });
+  assert.match(methodology.description, /actual published Visa Bulletin cutoff/);
+  assert.match(methodology.description, /No green-card approval dates or remaining wait times are predicted/);
+  assert.match(methodology.steps.join(' '), /strictly earlier, not equal/);
+  assert.match(methodology.steps.join(' '), /Current \(C\) and Unavailable \(U\)/);
+  assert.doesNotMatch(JSON.stringify(methodology), /historical-cutoff-scenarios|slower, typical|minimumHistoryMonths|minimumPositiveWindows|maximumHorizonMonths|ten years/);
+  assert.deepEqual(methodology.sourceUrls, [
+    'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html',
+    'https://www.uscis.gov/visabulletininfo',
+  ]);
+  assert.match(model.generatedAt, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(model.sourceAccess.verifiedAt, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(model.sourceAccess.inventory, /No current inventory was imported or inferred/);
+  assert.ok(Object.keys(model.series).length > 0);
+  assert.equal(model.series['India:EB1:finalAction'].toMonth, model.bulletinMonth);
+  assert.ok(Number.isFinite(model.series['India:EB1:finalAction'].netMovementMonths));
+});
 const employer = { id: 'abcdef0123456789', name: 'EXAMPLE & SONS <script>bad</script>', filings: 2, median: 150000 };
 const employerRows = [
   { id: 'case-1', title: 'Software Engineer', city: 'Sunnyvale', state: 'CA', wage: 100000, date: '2026-01-01', decisionDate: '2026-01-08', fullTime: true, status: 'Certified' },

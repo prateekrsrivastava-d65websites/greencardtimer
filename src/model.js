@@ -133,19 +133,13 @@ export function buildModelData(bulletinData, template) {
   return { ...template, generatedAt: bulletinData.generatedAt, bulletinMonth: bulletinData.latestMonth, series };
 }
 
-function scenarioDate(month, offset) {
-  const start = new Date(`${month}-01T00:00:00Z`);
-  start.setUTCMonth(start.getUTCMonth() + offset);
-  return start.toISOString().slice(0, 10);
-}
-
 export function evaluateProfile(profile, bulletinData, modelData) {
   const { country, category, priorityDate, chart = 'finalAction', filingPath = 'aos', bulletinMonth } = profile;
   const bulletin = (bulletinData.bulletins ?? []).find(item => item.month === (bulletinMonth ?? bulletinData.latestMonth)) ?? null;
   const cutoff = bulletin?.charts?.[chart]?.[category]?.[country] ?? null;
   const group = categoryGroup(category, bulletinData);
   const filingChart = bulletin?.[group === 'family' ? 'uscisFamilyChart' : 'uscisEmploymentChart'] ?? null;
-  const base = { cutoff, bulletin, categoryGroup: group, current: null, monthsBehind: null, scenarios: null, trend: null, canFile: null, approvalEligible: null, chartChoiceKnown: false, filingChart };
+  const base = { cutoff, bulletin, categoryGroup: group, current: null, monthsBehind: null, scenarios: null, trend: null, canFile: null, approvalEligible: null, chartChoiceKnown: false, filingChart, forecastKind: 'history-only', forecastReason: 'Published Visa Bulletins show cutoff history only. They do not predict individual approval dates or remaining waiting times.' };
   if (!parseDate(priorityDate) || !CHARTS.includes(chart) || !['aos', 'consular'].includes(filingPath)) {
     return { ...base, status: 'invalid', reason: 'Enter a valid priority date, chart and filing path.' };
   }
@@ -160,31 +154,5 @@ export function evaluateProfile(profile, bulletinData, modelData) {
   const parameters = modelData?.methodology?.parameters ?? {};
   const trend = deriveSeries(history, country, category, chart, parameters);
   const gap = parseDate(cutoff) ? Math.max(0, monthsBetween(cutoff, priorityDate)) : null;
-  const result = { ...base, ...selected, finalActionCutoff, filingCutoff, monthsBehind: gap, trend, canFile, chartChoiceKnown, approvalEligible: cutoffStatus(priorityDate, finalActionCutoff).current, forecastKind: group === 'family' ? 'history-only' : 'illustrative-trend', forecastReason: null };
-  if (group === 'family') {
-    result.forecastReason = 'Family preference categories show verified cutoff history only. No dated trend scenarios or approval-date forecasts are produced.';
-    return result;
-  }
-  if (selected.status !== 'waiting') {
-    result.forecastReason = selected.status === 'current' ? 'The selected cutoff is already met. A current cutoff does not predict the approval date.' : 'No dated cutoff is available to project from this bulletin.';
-    return result;
-  }
-  if (modelData?.methodology?.kind !== 'historical-cutoff-scenarios') {
-    result.forecastReason = 'No supported forecasting methodology is available.';
-    return result;
-  }
-  if (trend.monthsObserved < (parameters.minimumHistoryMonths ?? 12) || trend.positiveWindows < (parameters.minimumPositiveWindows ?? 3) || !(trend.netMovementMonths > 0)) {
-    result.forecastReason = 'This history does not show enough sustained net movement to support a dated trend scenario.';
-    return result;
-  }
-  const gapToPass = gap + 1 / AVERAGE_MONTH_DAYS;
-  const horizon = parameters.maximumHorizonMonths ?? 120;
-  result.scenarios = [['faster', 'Faster historical pace'], ['typical', 'Typical historical pace'], ['slower', 'Slower historical pace']].map(([id, label]) => {
-    const rate = trend.pace[id];
-    const months = rate > 0 ? Math.max(1, Math.ceil(gapToPass / rate)) : null;
-    const beyondHorizon = months !== null && months > horizon;
-    return { id, label, rate, months, beyondHorizon, date: months !== null && !beyondHorizon ? scenarioDate(bulletin.month, months) : null, reason: months === null ? 'No positive net pace in these historical windows.' : beyondHorizon ? 'Beyond the 10-year projection horizon.' : null };
-  });
-  result.forecastReason = 'Illustrative dates repeat the 25th, 50th and 75th percentiles of observed six-month net cutoff movement. They are not predicted approval dates or probability bounds.';
-  return result;
+  return { ...base, ...selected, finalActionCutoff, filingCutoff, monthsBehind: gap, trend, canFile, chartChoiceKnown, approvalEligible: cutoffStatus(priorityDate, finalActionCutoff).current };
 }

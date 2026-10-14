@@ -225,7 +225,7 @@ export async function refresh({ offline = false, maxMonths = 25, root = ROOT, fe
     template.sourceAccess.automation = 'GitHub Actions checks weekly. Official DOS HTML is fetched from travel.state.gov or its openly published adoption.state.gov/adoptions.state.gov hosts. Canonical sources and actual retrieval URLs are retained. All tracked cells and contiguous history are validated; errors preserve the published data. A monthly successful-check record does not change the data verification date.';
   }
   data.bulletins.forEach(validateBulletin);
-  template.methodology.familyCategories = 'Family-sponsored preference categories show sourced cutoff history only; no dated scenarios or approval forecasts are generated.';
+  template.methodology.familyCategories = 'Family-sponsored preference categories show published cutoff history. Historical cutoff movement does not predict remaining wait or an approval date.';
   template.sourceAccess.bulletins = 'Twenty-five contiguous official DOS bulletins include both Final Action Dates and Dates for Filing for five employment and five family preference categories across five chargeability areas. Canonical source and actual retrieval URLs are retained.';
   const model = buildModelData(data, template);
   await atomicJSON(bulletinPath, data);

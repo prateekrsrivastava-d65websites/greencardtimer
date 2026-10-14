@@ -91,11 +91,12 @@ test('family preferences retain historical movement but never generate dated sce
   assert.equal(evaluateProfile({ ...profile, category: 'F1', priorityDate: '2013-10-31' }, data, modelData).current, true);
 });
 
-test('unsupported categories and unavailable methodology yield no forecasts', () => {
+test('unsupported categories and unavailable methodology retain history-only scope', () => {
   assert.equal(evaluateProfile({ ...profile, category: 'EB4' }, bulletinData, modelData).status, 'unknown');
   const result = evaluateProfile(profile, bulletinData, {});
   assert.equal(result.scenarios, null);
-  assert.match(result.forecastReason, /No supported/);
+  assert.equal(result.forecastKind, 'history-only');
+  assert.match(result.forecastReason, /do not predict individual approval dates/);
 });
 
 test('retrogression is retained and C/U are excluded from numeric window rates', () => {
@@ -108,16 +109,74 @@ test('retrogression is retained and C/U are excluded from numeric window rates',
   assert.ok(trend.positiveWindows >= 3);
 });
 
-test('illustrative scenarios are labeled and never stand in for approval dates', () => {
+test('legacy scenario configuration cannot re-enable employment or family forecasts', () => {
   const result = evaluateProfile(profile, bulletinData, modelData);
-  assert.equal(result.forecastKind, 'illustrative-trend');
+  assert.equal(result.forecastKind, 'history-only');
   assert.equal(result.approvalEligible, false);
-  assert.equal(result.scenarios.length, 3);
-  assert.ok(result.scenarios[0].months <= result.scenarios[1].months);
-  assert.ok(result.scenarios[1].months <= result.scenarios[2].months);
-  assert.match(result.forecastReason, /not predicted approval dates/);
-  const remote = evaluateProfile({ ...profile, priorityDate: '2040-01-01' }, bulletinData, modelData);
-  assert.ok(remote.scenarios.every(scenario => scenario.beyondHorizon && scenario.date === null));
+  assert.ok(result.trend.positiveWindows >= 3);
+  assert.ok(result.trend.netMovementMonths > 0);
+  assert.equal(result.scenarios, null);
+  assert.match(result.forecastReason, /Published Visa Bulletins/);
+  assert.match(result.forecastReason, /do not predict individual approval dates/);
+  const legacy = { methodology: { kind: 'historical-cutoff-scenarios', parameters: { rollingWindowMonths: 6, minimumHistoryMonths: 0, minimumPositiveWindows: 0, maximumHorizonMonths: 10_000 } } };
+  for (const country of bulletinData.countries) {
+    for (const category of bulletinData.categories) {
+      for (const chart of ['finalAction', 'filing']) {
+        const remote = evaluateProfile({ ...profile, country: country.id, category: category.id, chart, priorityDate: '2040-01-01' }, bulletinData, legacy);
+        assert.equal(remote.scenarios, null, `${country.id}:${category.id}:${chart}`);
+        assert.equal(remote.forecastKind, 'history-only');
+      }
+    }
+  }
+});
+
+test('April 2026 India EB-1 dates show actual cutoffs and history, never a calendar forecast', () => {
+  const data = structuredClone(bulletinData);
+  // Freeze the official October 2024-October 2026 India EB-1 regression history.
+  const finalAction = [
+    '2022-02-01', '2022-02-01', '2022-02-01', '2022-02-01', '2022-02-01', '2022-02-01',
+    '2022-02-15', '2022-02-15', '2022-02-15', '2022-02-15', '2022-02-15', '2022-02-15',
+    '2022-02-15', '2022-02-15', '2022-03-15', '2023-02-01', '2023-02-01', '2023-03-01',
+    '2023-04-01', '2023-04-01', '2022-12-15', '2022-10-15', '2022-10-15', '2022-10-15', '2023-02-01',
+  ];
+  const filing = [
+    ...Array(12).fill('2022-04-15'), ...Array(3).fill('2023-04-15'), ...Array(2).fill('2023-08-01'),
+    ...Array(7).fill('2023-12-01'), '2024-07-01',
+  ];
+  for (const [index, bulletin] of [...data.bulletins].reverse().entries()) {
+    bulletin.charts.finalAction.EB1.India = finalAction[index];
+    bulletin.charts.filing.EB1.India = filing[index];
+  }
+  for (const chart of ['finalAction', 'filing']) {
+    for (const day of ['01', '15', '30']) {
+      const result = evaluateProfile({ ...profile, category: 'EB1', priorityDate: `2026-04-${day}`, chart }, data, modelData);
+      assert.equal(result.status, 'waiting');
+      assert.equal(result.current, false);
+      assert.equal(result.finalActionCutoff, '2023-02-01');
+      assert.equal(result.filingCutoff, '2024-07-01');
+      assert.equal(result.cutoff, chart === 'finalAction' ? '2023-02-01' : '2024-07-01');
+      assert.equal(result.approvalEligible, false);
+      assert.equal(result.canFile, null);
+      assert.equal(result.chartChoiceKnown, false);
+      assert.equal(result.scenarios, null);
+      assert.equal(result.forecastKind, 'history-only');
+      assert.equal(result.trend.points.length, 25);
+      assert.equal(result.trend.monthsObserved, 24);
+      assert.ok(result.monthsBehind > (chart === 'finalAction' ? 37 : 20));
+      assert.ok(result.monthsBehind < (chart === 'finalAction' ? 39 : 22));
+      assert.match(result.forecastReason, /do not predict individual approval dates/);
+    }
+    const cutoff = chart === 'finalAction' ? '2023-02-01' : '2024-07-01';
+    const previousDay = chart === 'finalAction' ? '2023-01-31' : '2024-06-30';
+    const equal = evaluateProfile({ ...profile, category: 'EB1', priorityDate: cutoff, chart }, data, modelData);
+    assert.equal(equal.current, false);
+    const earlier = evaluateProfile({ ...profile, category: 'EB1', priorityDate: previousDay, chart }, data, modelData);
+    assert.equal(earlier.current, true);
+    assert.equal(earlier.approvalEligible, chart === 'finalAction');
+    assert.equal(earlier.scenarios, null);
+    assert.equal(earlier.forecastKind, 'history-only');
+    assert.match(earlier.forecastReason, /do not predict individual approval dates/);
+  }
 });
 
 test('production bulletins retain twenty-five contiguous months and one hundred complete tracked cells', () => {

@@ -36,8 +36,8 @@ test('metadata targets real data coverage rather than the calendar or invented w
     assert.match(route.description, /FY2026 Q3: 391,764/);
     assert.match(route.description, /53,787 employers/);
   }
-  assert.match(routeMetadata('/').title, /Green Card Wait Time/);
-  assert.match(routeMetadata('/').description, /not a guaranteed approval date/);
+  assert.match(routeMetadata('/').title, /Green Card Priority Date Tracker/);
+  assert.match(routeMetadata('/').description, /official visa bulletin cutoffs/);
   assert.doesNotMatch(routeMetadata('/employers/').description, /visa approval rate|currently hiring/);
 });
 

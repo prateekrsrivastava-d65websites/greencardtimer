@@ -201,15 +201,35 @@ test('priority-date workspace switches community and results without changing re
   assertCommunity(saved.html(), false);
   assert.equal(saved.requests.filter(request => request.options?.method === 'POST').length, 0);
 
-  for (const category of ['EB2', 'F2A']) {
-    const shared = await browserHarness({ search: `?country=India&category=${category}&priorityDate=2017-04-21&chart=finalAction&filingPath=aos` });
+  for (const category of ['EB2', 'F2A', 'EB1']) {
+    const priorityDate = category === 'EB1' ? '2026-04-15' : '2017-04-21';
+    const shared = await browserHarness({ search: `?country=India&category=${category}&priorityDate=${priorityDate}&chart=finalAction&filingPath=aos` });
     assert.equal(shared.location.pathname, category === 'F2A' ? '/family-green-card/' : '/');
     assert.equal(shared.location.search, '');
-    assert.equal(shared.html()('#priority-date').val(), '04-21-2017');
+    assert.equal(shared.html()('#priority-date').val(), category === 'EB1' ? '04-15-2026' : '04-21-2017');
     assert.equal(shared.html()('.workspace > .results').length, 1);
     assertCommunity(shared.html(), false);
     assert.equal(shared.requests.filter(request => request.options?.method === 'POST').length, 0);
+    const result = shared.html();
+    assert.deepEqual(result('.results .metric-label').map((_, element) => result(element).text()).get(), ['Final action cutoff', 'Your priority date', 'Monthly cutoff movement']);
+    assert.equal(result('.results .metric-value').eq(1).text(), category === 'EB1' ? 'Apr 15, 2026' : 'Apr 21, 2017');
+    assert.match(result('.approval-note').text(), /does not predict your approval date or remaining wait/);
+    assert.equal(result('.result-source a').attr('href'), bulletinData.bulletins.find(bulletin => bulletin.month === bulletinData.latestMonth).sourceUrl);
+    assert.match(result('.result-source').text(), /Snapshot verified/);
+    assert.equal(result('.scenario-band, .scenario-grid, .scenario-date, .empty-estimate').length, 0);
+    assert.doesNotMatch(result('.results').text(), /Beyond 10 years|Typical pace scenario|Illustrative cutoff scenarios/);
+    if (category === 'EB1') {
+      await shared.trigger('click', '[data-chart="filing"]');
+      assert.equal(shared.html()('.results .metric-label').first().text(), 'Filing cutoff');
+      assert.equal(shared.html()('.results .metric-value').eq(1).text(), 'Apr 15, 2026');
+      assert.equal(shared.html()('.scenario-band, .scenario-date').length, 0);
+      assert.equal(shared.requests.filter(request => request.options?.method === 'POST').length, 0);
+    }
   }
+
+  const sources = await browserHarness({ route: '/methodology/' });
+  assert.match(sources.html().text(), /A remaining wait or individual approval date cannot be inferred/);
+  assert.doesNotMatch(sources.html().text(), /Projections beyond 10 years|slower, typical and faster future cutoff paths/);
   const invalidShared = await browserHarness({ search: '?priorityDate=2025-02-29' });
   assert.equal(invalidShared.html()('.results').length, 0);
   assert.equal(invalidShared.html()('#priority-date').val(), '');
