@@ -43,7 +43,8 @@ test('community and privacy static pages disclose automatic exact search counts 
   assert.match(privacy.text(),/platform logs are separate from the search counters/);
   assert.match(privacy.text(),/Browsing, typing, loading or saving profiles, chart changes, employer searches and PERM dates are not recorded/);
   assert.match(privacy.text(),/10,000-search daily cap/);
-  assert.match(privacy.text(),/Last updated: October 11, 2026/);
+  assert.match(privacy.text(),/Google Analytics.*With your permission/);
+  assert.match(privacy.text(),/Last updated: October 17, 2026/);
   for (const path of ['/privacy/', '/community/']) {
     assert.doesNotMatch(ROUTES.find(route => route.path === path).description,/optional/i);
   }

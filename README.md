@@ -23,7 +23,7 @@ Push this directory as the repository root. Connect the repository through [Clou
 - Production branch: `main`
 - Build image: v3, with `NODE_VERSION=22.16.0` and `PYTHON_VERSION=3.13.3`
 - Production `SITE_URL`: `https://greencardtimer.com`, matching the origin used in CI. This enables canonical links, `robots.txt`, and `sitemap.xml`. Local or preview builds may set their own origin; without `SITE_URL`, none of those domain-specific files or tags are generated.
-- Google Search Console uses the D65 account's `google-site-verification` meta tag in `index.html`. Keep this tag in every deployment, and do not restore personal-account verification files. No analytics script, subscription, or scheduled submission is needed. The sitemap stays at `/sitemap.xml` and is regenerated on each build.
+- Google Search Console uses the D65 account's `google-site-verification` meta tag in `index.html`. Keep this tag in every deployment, and do not restore personal-account verification files. The sitemap stays at `/sitemap.xml` and is regenerated on each build. Google Analytics uses a separate D65 GA4 property and loads only after a visitor allows it; no subscription is needed.
 
 The [current build image includes Python](https://developers.cloudflare.com/pages/configuration/build-image/). Attach the custom domain through the Cloudflare dashboard after the first successful deployment. Government tools remain static and bypass Functions. Only `/api/community` invokes a Function with the `COMMUNITY_DB` D1 binding. No KV, R2, paid API or GitHub deployment secret is needed. Free-tier limits still apply; a domain registration is separate.
 
@@ -75,7 +75,7 @@ The home page and `/community/` publish community search donut charts rendered w
 
 Initialize `migrations/0001-community.sql` in the `greencardtimer-community` database, and bind it as `COMMUNITY_DB` in Pages production settings. The schema atomically updates one JSON rollup per UTC day with a 10,000-search daily cap to bound free-tier resource use. Public summaries cover the last 30 UTC calendar days, including today, and expose exact total and bin counts from the first accepted search, without sample thresholds, hidden bins or rounding. Accepted POST requests return a fresh summary so the submitter's charts update immediately when the response is available; GET responses and client summaries can be cached for up to 60 seconds, bounded by UTC midnight. Rollups beyond 90 days are pruned upon the first search of a new day; idle records may remain longer. Platform operational logs are separate and may include IP addresses. No paid plan was enabled.
 
-Functions are restricted by `public/_routes.json` so ordinary pages and data assets keep static hosting behavior. Free-tier exhaustion disables only the community counters; government tools keep working. There is no third-party analytics or advertising script. No synthetic events are inserted into production.
+Functions are restricted by `public/_routes.json` so ordinary pages and data assets keep static hosting behavior. Free-tier exhaustion disables only the community counters; government tools keep working. Optional Google Analytics tracks page views after consent; enhanced measurement and advertising signals are off. There is no advertising script or synthetic production event.
 
 ## Build Details
 
