@@ -180,11 +180,21 @@ test('April 2026 India EB-1 dates show actual cutoffs and history, never a calen
 });
 
 test('January 2026 India EB-1 compares correctly with the published October 2026 bulletin', () => {
-  const result = evaluateProfile({ ...profile, category: 'EB1', priorityDate: '2026-01-01', chart: 'finalAction' }, productionBulletinData, modelData);
+  const result = evaluateProfile({ ...profile, category: 'EB1', priorityDate: '2026-01-01', chart: 'finalAction', bulletinMonth: '2026-10' }, productionBulletinData, modelData);
   assert.equal(result.status, 'waiting');
   assert.equal(result.finalActionCutoff, '2023-02-01');
   assert.equal(result.filingCutoff, '2024-07-01');
   assert.ok(result.monthsBehind > 34 && result.monthsBehind < 36);
+  assert.equal(result.scenarios, null);
+});
+
+test('November 2026 India EB-1 retains separate sourced final-action and filing cutoffs', () => {
+  const result = evaluateProfile({ ...profile, category: 'EB1', priorityDate: '2026-01-01', chart: 'finalAction', bulletinMonth: '2026-11' }, productionBulletinData, modelData);
+  assert.equal(result.bulletin.sourceUrl, 'https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2027/visa-bulletin-for-november-2026.html');
+  assert.equal(result.finalActionCutoff, '2023-02-01');
+  assert.equal(result.filingCutoff, '2024-07-01');
+  assert.equal(result.status, 'waiting');
+  assert.equal(result.canFile, null);
   assert.equal(result.scenarios, null);
 });
 

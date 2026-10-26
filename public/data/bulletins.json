@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-12",
-  "latestMonth": "2026-10",
+  "generatedAt": "2026-10-26",
+  "latestMonth": "2026-11",
   "source": "U.S. Department of State Visa Bulletin",
   "sourceUrl": "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
   "verificationMethod": "Four official DOS family and employment HTML tables identified by chart heading and parsed with Cheerio; all 100 tracked cells and contiguous monthly history validated.",
@@ -86,6 +86,163 @@
     }
   ],
   "bulletins": [
+    {
+      "month": "2026-11",
+      "label": "November 2026",
+      "sourceUrl": "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2027/visa-bulletin-for-november-2026.html",
+      "publishedAt": "2026-10-05",
+      "verifiedAt": "2026-10-26",
+      "uscisEmploymentChart": null,
+      "uscisFamilyChart": null,
+      "uscisSourceUrl": "https://www.uscis.gov/visabulletininfo",
+      "charts": {
+        "finalAction": {
+          "EB1": {
+            "India": "2023-02-01",
+            "China": "2023-08-01",
+            "Mexico": "C",
+            "Philippines": "C",
+            "ROW": "C"
+          },
+          "EB2": {
+            "India": "2013-11-01",
+            "China": "2021-10-01",
+            "Mexico": "2025-04-01",
+            "Philippines": "2025-04-01",
+            "ROW": "2025-04-01"
+          },
+          "EB3": {
+            "India": "2014-01-22",
+            "China": "2022-01-22",
+            "Mexico": "2024-06-15",
+            "Philippines": "2023-08-15",
+            "ROW": "2024-06-15"
+          },
+          "EB3OW": {
+            "India": "2014-01-22",
+            "China": "2019-10-01",
+            "Mexico": "2022-06-01",
+            "Philippines": "2022-01-01",
+            "ROW": "2022-06-01"
+          },
+          "EB5": {
+            "India": "2023-12-01",
+            "China": "2016-12-01",
+            "Mexico": "C",
+            "Philippines": "C",
+            "ROW": "C"
+          },
+          "F1": {
+            "India": "2021-01-22",
+            "China": "2021-01-22",
+            "Mexico": "2008-09-22",
+            "Philippines": "2013-11-01",
+            "ROW": "2021-01-22"
+          },
+          "F2A": {
+            "India": "2026-10-22",
+            "China": "2026-10-22",
+            "Mexico": "2026-04-22",
+            "Philippines": "2026-10-22",
+            "ROW": "2026-10-22"
+          },
+          "F2B": {
+            "India": "2020-08-22",
+            "China": "2020-08-22",
+            "Mexico": "2010-05-15",
+            "Philippines": "2013-10-01",
+            "ROW": "2020-08-22"
+          },
+          "F3": {
+            "India": "2015-10-22",
+            "China": "2015-10-22",
+            "Mexico": "2001-07-15",
+            "Philippines": "2006-07-22",
+            "ROW": "2015-10-22"
+          },
+          "F4": {
+            "India": "2006-12-15",
+            "China": "2012-10-22",
+            "Mexico": "2001-04-22",
+            "Philippines": "2008-05-15",
+            "ROW": "2012-10-22"
+          }
+        },
+        "filing": {
+          "EB1": {
+            "India": "2024-07-01",
+            "China": "2024-07-01",
+            "Mexico": "C",
+            "Philippines": "C",
+            "ROW": "C"
+          },
+          "EB2": {
+            "India": "2015-01-15",
+            "China": "2023-01-01",
+            "Mexico": "2026-03-15",
+            "Philippines": "2026-03-15",
+            "ROW": "2026-03-15"
+          },
+          "EB3": {
+            "India": "2015-01-15",
+            "China": "2024-04-01",
+            "Mexico": "2024-08-01",
+            "Philippines": "2024-01-01",
+            "ROW": "2024-08-01"
+          },
+          "EB3OW": {
+            "India": "2015-01-15",
+            "China": "2020-10-01",
+            "Mexico": "2022-07-01",
+            "Philippines": "2022-06-01",
+            "ROW": "2022-07-01"
+          },
+          "EB5": {
+            "India": "2024-05-01",
+            "China": "2021-03-01",
+            "Mexico": "C",
+            "Philippines": "C",
+            "ROW": "C"
+          },
+          "F1": {
+            "India": "2021-02-01",
+            "China": "2021-02-01",
+            "Mexico": "2008-12-01",
+            "Philippines": "2015-04-22",
+            "ROW": "2021-02-01"
+          },
+          "F2A": {
+            "India": "C",
+            "China": "C",
+            "Mexico": "C",
+            "Philippines": "C",
+            "ROW": "C"
+          },
+          "F2B": {
+            "India": "2020-09-01",
+            "China": "2020-09-01",
+            "Mexico": "2011-03-22",
+            "Philippines": "2014-10-01",
+            "ROW": "2020-09-01"
+          },
+          "F3": {
+            "India": "2015-11-01",
+            "China": "2015-11-01",
+            "Mexico": "2002-12-01",
+            "Philippines": "2006-10-22",
+            "ROW": "2015-11-01"
+          },
+          "F4": {
+            "India": "2007-02-01",
+            "China": "2012-11-01",
+            "Mexico": "2001-04-30",
+            "Philippines": "2009-03-22",
+            "ROW": "2012-11-01"
+          }
+        }
+      },
+      "retrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2027/visa-bulletin-for-november-2026.html"
+    },
     {
       "month": "2026-10",
       "label": "October 2026",
@@ -3853,169 +4010,12 @@
         }
       },
       "retrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2025/visa-bulletin-for-november-2024.html"
-    },
-    {
-      "month": "2024-10",
-      "label": "October 2024",
-      "sourceUrl": "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2025/visa-bulletin-for-october-2024.html",
-      "publishedAt": "2024-09-03",
-      "verifiedAt": "2026-10-12",
-      "uscisEmploymentChart": null,
-      "uscisFamilyChart": null,
-      "uscisSourceUrl": "https://www.uscis.gov/visabulletininfo",
-      "charts": {
-        "finalAction": {
-          "EB1": {
-            "India": "2022-02-01",
-            "China": "2022-11-08",
-            "Mexico": "C",
-            "Philippines": "C",
-            "ROW": "C"
-          },
-          "EB2": {
-            "India": "2012-07-15",
-            "China": "2020-03-22",
-            "Mexico": "2023-03-15",
-            "Philippines": "2023-03-15",
-            "ROW": "2023-03-15"
-          },
-          "EB3": {
-            "India": "2012-11-01",
-            "China": "2020-04-01",
-            "Mexico": "2022-11-15",
-            "Philippines": "2022-11-15",
-            "ROW": "2022-11-15"
-          },
-          "EB3OW": {
-            "India": "2012-11-01",
-            "China": "2017-01-01",
-            "Mexico": "2020-12-01",
-            "Philippines": "2020-12-01",
-            "ROW": "2020-12-01"
-          },
-          "EB5": {
-            "India": "2022-01-01",
-            "China": "2016-07-15",
-            "Mexico": "C",
-            "Philippines": "C",
-            "ROW": "C"
-          },
-          "F1": {
-            "India": "2015-10-22",
-            "China": "2015-10-22",
-            "Mexico": "2003-01-01",
-            "Philippines": "2012-03-01",
-            "ROW": "2015-10-22"
-          },
-          "F2A": {
-            "India": "2021-11-22",
-            "China": "2021-11-22",
-            "Mexico": "2021-03-08",
-            "Philippines": "2021-11-22",
-            "ROW": "2021-11-22"
-          },
-          "F2B": {
-            "India": "2016-05-01",
-            "China": "2016-05-01",
-            "Mexico": "2005-01-15",
-            "Philippines": "2011-10-22",
-            "ROW": "2016-05-01"
-          },
-          "F3": {
-            "India": "2010-04-01",
-            "China": "2010-04-01",
-            "Mexico": "2000-08-22",
-            "Philippines": "2002-09-08",
-            "ROW": "2010-04-01"
-          },
-          "F4": {
-            "India": "2006-03-01",
-            "China": "2007-08-01",
-            "Mexico": "2001-02-22",
-            "Philippines": "2004-02-01",
-            "ROW": "2007-08-01"
-          }
-        },
-        "filing": {
-          "EB1": {
-            "India": "2022-04-15",
-            "China": "2023-01-01",
-            "Mexico": "C",
-            "Philippines": "C",
-            "ROW": "C"
-          },
-          "EB2": {
-            "India": "2013-01-01",
-            "China": "2020-10-01",
-            "Mexico": "2023-08-01",
-            "Philippines": "2023-08-01",
-            "ROW": "2023-08-01"
-          },
-          "EB3": {
-            "India": "2013-06-08",
-            "China": "2020-11-15",
-            "Mexico": "2023-03-01",
-            "Philippines": "2023-03-01",
-            "ROW": "2023-03-01"
-          },
-          "EB3OW": {
-            "India": "2013-06-08",
-            "China": "2018-01-01",
-            "Mexico": "2021-05-22",
-            "Philippines": "2021-05-22",
-            "ROW": "2021-05-22"
-          },
-          "EB5": {
-            "India": "2022-04-01",
-            "China": "2016-10-01",
-            "Mexico": "C",
-            "Philippines": "C",
-            "ROW": "C"
-          },
-          "F1": {
-            "India": "2017-09-01",
-            "China": "2017-09-01",
-            "Mexico": "2005-10-01",
-            "Philippines": "2015-04-22",
-            "ROW": "2017-09-01"
-          },
-          "F2A": {
-            "India": "2024-07-15",
-            "China": "2024-07-15",
-            "Mexico": "2024-07-15",
-            "Philippines": "2024-07-15",
-            "ROW": "2024-07-15"
-          },
-          "F2B": {
-            "India": "2017-01-01",
-            "China": "2017-01-01",
-            "Mexico": "2005-08-01",
-            "Philippines": "2013-10-01",
-            "ROW": "2017-01-01"
-          },
-          "F3": {
-            "India": "2011-07-01",
-            "China": "2011-07-01",
-            "Mexico": "2001-06-15",
-            "Philippines": "2004-05-08",
-            "ROW": "2011-07-01"
-          },
-          "F4": {
-            "India": "2006-06-15",
-            "China": "2008-03-01",
-            "Mexico": "2001-04-30",
-            "Philippines": "2006-08-01",
-            "ROW": "2008-03-01"
-          }
-        }
-      },
-      "retrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2025/visa-bulletin-for-october-2024.html"
     }
   ],
   "refresh": {
-    "checkedAt": "2026-10-12",
-    "latestMonth": "2026-10",
+    "checkedAt": "2026-10-26",
+    "latestMonth": "2026-11",
     "indexRetrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin.html",
-    "latestRetrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2027/visa-bulletin-for-october-2026.html"
+    "latestRetrievedFrom": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2027/visa-bulletin-for-november-2026.html"
   }
 }

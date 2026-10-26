@@ -1,6 +1,6 @@
 import './style.css';
 import { createIcons, Hourglass, Clock3, CalendarDays, BriefcaseBusiness, BookOpen, Unlock, ArrowUpRight, ArrowRight, ArrowLeft, Bookmark, Trash2, ShieldCheck, CircleCheck, CircleAlert, Share2, Printer, Search, Download, ChevronLeft, ChevronRight, LockKeyhole, Info, Globe, RefreshCw, UsersRound } from 'lucide';
-import { evaluateProfile, formatDate, parseDate, compareCutoffs, parseInputDate, formatInputDate, categoryGroup as getCategoryGroup } from './model.js';
+import { evaluateProfile, formatDate, parseDate, compareCutoffs, cutoffStatus, parseInputDate, formatInputDate, categoryGroup as getCategoryGroup } from './model.js';
 import { loadCareerIndex, loadCareerRows, autocompleteEmployers, searchSponsors, searchCareer, benchmarkOffer, careerRowsToCsv, employerProfilePath, employerIdFromPath, employerSalaryPath, employerIdFromSearch, buildEmployerProfile } from './career.js';
 import { compareProcessingMonth, formatProcessingMonth, processingFreshness } from './processing.js';
 import { createCommunityRecorder } from './community-client.js';
@@ -77,13 +77,19 @@ function heading(route, edition = '') {
   return `<div class="page-heading"><div><h1>${esc(title)}</h1><p>${description}</p></div>${edition ? `<div class="edition"><span class="edition-dot"></span>${esc(edition)}</div>` : ''}</div>`;
 }
 function metric(label, value, detail = '', color = '') { return `<div class="metric"><div class="metric-label">${esc(label)}</div><div class="metric-value ${color}">${esc(value)}</div><div class="metric-sub">${esc(detail)}</div></div>`; }
-function dateGapLabel(months) {
-  const total = Math.max(0, Math.round(months));
-  if (!total) return 'Under 1 mo';
-  const years = Math.floor(total / 12), remainder = total % 12;
-  return [years && `${years} yr`, remainder && `${remainder} mo`].filter(Boolean).join(' ');
-}
 function movement(previous, current) { const change = compareCutoffs(previous, current); if (change.type === 'unchanged') return '<span class="movement muted">No change</span>'; if (change.months !== null) return `<span class="movement ${change.months > 0 ? 'positive' : 'negative'}">${change.months > 0 ? '+' : ''}${change.months.toFixed(1)} months</span>`; return `<span class="movement muted">${esc({ current: 'Now Current', retrogressed: 'Retrogressed', unavailable: 'Unavailable', available: 'Reopened', unknown: 'Not comparable' }[change.type])}</span>`; }
+function chartComparison(priorityDate, cutoff, label) {
+  const { status } = cutoffStatus(priorityDate, cutoff);
+  if (status === 'current') return [`Current on ${label}`, cutoff === 'C' ? 'The bulletin marks this chart Current for all priority dates.' : `${formatDate(priorityDate)} is earlier than the ${formatDate(cutoff)} cutoff.`];
+  if (status === 'waiting') return [`Not current on ${label}`, `${formatDate(priorityDate)} is not earlier than the ${formatDate(cutoff)} cutoff.`];
+  if (status === 'unavailable') return [`Unavailable on ${label}`, 'The bulletin marks this category Unavailable for this chart.'];
+  return [`Cutoff not verified on ${label}`, 'Check the official bulletin before making a decision.'];
+}
+function cutoffMetricDetail(status) {
+  if (status === 'current') return 'Your date meets this chart';
+  if (status === 'waiting') return 'Your date is not earlier';
+  return status === 'unavailable' ? 'Unavailable in this bulletin' : 'Not verified';
+}
 function readProfile() {
   const form = document.querySelector('#profile-form');
   if (!form) return true;
@@ -163,15 +169,14 @@ function renderTimeline() {
     return;
   }
   const result = evaluateProfile(profile, bulletins, model);
-  const status = { waiting: ['clock-3', 'wait', 'Your priority date has not met the cutoff', 'The cutoff must move past your priority date.'], current: ['circle-check', '', 'Your priority date meets this cutoff', 'Visa availability alone does not mean your case will be approved.'], unavailable: ['circle-alert', 'unknown', 'This category is unavailable', 'No visas are authorized in this category for this bulletin.'], unknown: ['circle-alert', 'unknown', 'Cutoff not verified', 'Check the official source before making a decision.'] }[result.status];
+  const chartLabel = profile.chart === 'finalAction' ? 'Final Action Dates' : 'Dates for Filing';
+  const [comparisonTitle, comparisonDetail] = chartComparison(profile.priorityDate, result.cutoff, chartLabel);
+  const status = { waiting: ['clock-3', 'wait'], current: ['circle-check', ''], unavailable: ['circle-alert', 'unknown'], unknown: ['circle-alert', 'unknown'] }[result.status];
   if (!status) { main.innerHTML = '<div class="error-box">Enter a valid priority date.</div>'; finishRender(); return; }
   const latest = result.bulletin;
-  const lastChange = result.trend.lastMovement;
-  const movementValue = lastChange.type === 'unchanged' ? 'No change' : lastChange.months !== null ? `${lastChange.months > 0 ? '+' : ''}${lastChange.months.toFixed(1)} months` : { current: 'Now Current', retrogressed: 'Retrogressed', unavailable: 'Unavailable', available: 'Reopened', unknown: 'Not comparable' }[lastChange.type];
-  const thirdMetric = result.status === 'waiting' && result.monthsBehind !== null
-    ? metric('Calendar gap', dateGapLabel(result.monthsBehind), 'Between dates, not wait time')
-    : metric('Monthly cutoff movement', movementValue, 'Cutoff-date change, not wait remaining', lastChange.months > 0 ? 'green' : lastChange.type === 'retrogressed' ? 'coral' : '');
-  main.innerHTML = `${heading(timelineRoute(), `${latest.label} bulletin`)}${coverage}<div class="workspace"><aside>${profilePanel()}</aside><section class="results" id="timeline-result" tabindex="-1"><div class="result-overview"><div class="result-topline"><h2>${esc(countryLabel(profile.country))} / ${esc(categoryLabel(profile.category))}</h2><div class="action-icons">${button('share-2', 'Copy a link to this profile', 'share')}${button('printer', 'Print or save as PDF', 'print')}</div></div>${family ? `<p class="category-description">${esc(bulletins.categories.find(c => c.id === profile.category)?.description || '')}</p>` : ''}<p class="result-source">${sourceLink(latest.sourceUrl || bulletins.sourceUrl, `${latest.label} official bulletin`)}<span>Snapshot verified ${formatDate(latest.verifiedAt || bulletins.generatedAt)}</span></p><div class="status-line"><span class="status-icon ${status[1]}">${icon(status[0])}</span><div><strong>${status[2]}</strong><span class="muted">${status[3]}</span></div></div><div class="metrics">${metric(profile.chart === 'finalAction' ? 'Final action cutoff' : 'Filing cutoff', formatDate(result.cutoff), latest.label, result.current ? 'green' : '')}${metric('Your priority date', formatDate(profile.priorityDate), 'The date entered for this check')}${thirdMetric}</div><p class="approval-note">The published cutoff does not predict your approval date or remaining wait.</p>
+  const finalActionStatus = cutoffStatus(profile.priorityDate, result.finalActionCutoff);
+  const filingStatus = cutoffStatus(profile.priorityDate, result.filingCutoff);
+  main.innerHTML = `${heading(timelineRoute(), `${latest.label} bulletin`)}${coverage}<div class="workspace"><aside>${profilePanel()}</aside><section class="results" id="timeline-result" tabindex="-1"><div class="result-overview"><div class="result-topline"><h2>${esc(countryLabel(profile.country))} / ${esc(categoryLabel(profile.category))}</h2><div class="action-icons">${button('share-2', 'Copy a link to this profile', 'share')}${button('printer', 'Print or save as PDF', 'print')}</div></div>${family ? `<p class="category-description">${esc(bulletins.categories.find(c => c.id === profile.category)?.description || '')}</p>` : ''}<p class="result-source">${sourceLink(latest.sourceUrl || bulletins.sourceUrl, `${latest.label} official bulletin`)}<span>Snapshot verified ${formatDate(latest.verifiedAt || bulletins.generatedAt)}</span></p><div class="status-line"><span class="status-icon ${status[1]}">${icon(status[0])}</span><div><strong>${esc(comparisonTitle)}</strong><span class="muted">${esc(comparisonDetail)}</span></div></div><div class="metrics">${metric('Final action cutoff', formatDate(result.finalActionCutoff), cutoffMetricDetail(finalActionStatus.status), finalActionStatus.current ? 'green' : '')}${metric('Filing cutoff', formatDate(result.filingCutoff), cutoffMetricDetail(filingStatus.status), filingStatus.current ? 'green' : '')}${metric('Your priority date', formatDate(profile.priorityDate), 'The date entered for this check')}</div><p class="approval-note">A dated cutoff requires a priority date strictly earlier, not equal. Neither chart predicts an approval date or remaining wait. <a href="/methodology/">How this works</a></p>
   ${profile.filingPath === 'aos' && !result.chartChoiceKnown ? `<div class="inline-notice">${icon('info')}<span>USCIS ${family ? 'family ' : ''}chart selection is not verified here. ${sourceLink('https://www.uscis.gov/visabulletininfo', 'Check the monthly chart')} before filing I-485.</span></div>` : `<p class="chart-caption">${profile.filingPath === 'consular' ? 'Dates for Filing concern document submission when instructed by the National Visa Center. They do not authorize approval.' : 'Check all USCIS eligibility requirements before filing.'}</p>`}${family && profile.category === 'F2A' ? `<p class="chart-caption">F2A per-country exemptions and allocation limits also apply. ${sourceLink(latest.sourceUrl, 'Check this bulletin\u0027s F2A notes')}.</p>` : ''}</div>
   <div class="section-heading"><div><h2>Cutoff movement</h2><p>${profile.chart === 'finalAction' ? 'Final action dates' : 'Dates for filing'} / actual published history</p></div><div class="segment" role="group" aria-label="History range">${[6, 12, 24].map(n => `<button data-window="${n}" aria-pressed="${chartWindow === n}" class="${chartWindow === n ? 'active' : ''}">${n}m</button>`).join('')}</div></div>${historyChart(result.trend.points)}<p class="chart-caption">${result.trend.advancedMonths} advancing months, ${result.trend.unchangedMonths} unchanged, ${result.trend.retrogressedMonths} retrogressions in the verified history. Gaps mark Current or Unavailable.</p>
   ${family ? `<section class="family-scope"><h2>Family preference categories</h2><dl>${routeCategories().map(c => `<div><dt>${esc(c.label)}</dt><dd>${esc(c.description || '')}</dd></div>`).join('')}</dl><p class="chart-caption">Immediate relatives of U.S. citizens are not covered by these preference cutoffs. Age-out rules, category changes and individual eligibility are not calculated here. Published cutoffs do not predict your approval date.</p></section>` : ''}${adSpace(family ? 'family-between-sections' : 'timeline-between-sections')}

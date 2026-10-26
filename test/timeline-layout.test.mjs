@@ -215,18 +215,21 @@ test('priority-date workspace switches community and results without changing re
     assertCommunity(shared.html(), false);
     assert.equal(shared.requests.filter(request => request.options?.method === 'POST').length, 0);
     const result = shared.html();
-    assert.deepEqual(result('.results .metric-label').map((_, element) => result(element).text()).get(), ['Final action cutoff', 'Your priority date', category === 'F2A' ? 'Monthly cutoff movement' : 'Calendar gap']);
-    assert.equal(result('.results .metric-value').eq(1).text(), category === 'EB1' ? 'Apr 15, 2026' : 'Apr 21, 2017');
-    if (category !== 'F2A') assert.match(result('.results .metric-sub').eq(2).text(), /not wait time/);
-    assert.match(result('.approval-note').text(), /does not predict your approval date or remaining wait/);
+    assert.deepEqual(result('.results .metric-label').map((_, element) => result(element).text()).get(), ['Final action cutoff', 'Filing cutoff', 'Your priority date']);
+    assert.equal(result('.results .metric-value').eq(2).text(), category === 'EB1' ? 'Apr 15, 2026' : 'Apr 21, 2017');
+    assert.match(result('.status-line strong').text(), /Final Action Dates/);
+    assert.match(result('.status-line .muted').text(), /earlier than the .* cutoff|bulletin marks this chart/);
+    assert.match(result('.approval-note').text(), /Neither chart predicts an approval date or remaining wait/);
+    assert.equal(result('.approval-note a').attr('href'), '/methodology/');
     assert.equal(result('.result-source a').attr('href'), bulletinData.bulletins.find(bulletin => bulletin.month === bulletinData.latestMonth).sourceUrl);
     assert.match(result('.result-source').text(), /Snapshot verified/);
     assert.equal(result('.scenario-band, .scenario-grid, .scenario-date, .empty-estimate').length, 0);
     assert.doesNotMatch(result('.results').text(), /Beyond 10 years|Typical pace scenario|Illustrative cutoff scenarios/);
     if (category === 'EB1') {
       await shared.trigger('click', '[data-chart="filing"]');
-      assert.equal(shared.html()('.results .metric-label').first().text(), 'Filing cutoff');
-      assert.equal(shared.html()('.results .metric-value').eq(1).text(), 'Apr 15, 2026');
+      assert.equal(shared.html()('.results .metric-label').first().text(), 'Final action cutoff');
+      assert.equal(shared.html()('.results .metric-value').eq(2).text(), 'Apr 15, 2026');
+      assert.match(shared.html()('.status-line strong').text(), /Dates for Filing/);
       assert.equal(shared.html()('.scenario-band, .scenario-date').length, 0);
       assert.equal(shared.requests.filter(request => request.options?.method === 'POST').length, 0);
     }
