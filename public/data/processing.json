@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "sourceUrl": "https://flag.dol.gov/processingtimes",
-  "generatedAt": "2026-10-12",
-  "verifiedAt": "2026-10-12",
+  "generatedAt": "2026-10-27",
+  "verifiedAt": "2026-10-27",
   "refresh": {
-    "checkedAt": "2026-10-12"
+    "checkedAt": "2026-10-27"
   },
   "updateSchedule": "DOL publishes PERM and PWD processing updates at the end of the first work week of each month.",
   "notes": [
@@ -18,7 +18,7 @@
     "perm": {
       "asOf": "2026-10-05",
       "queues": {
-        "analystReview": "2025-12",
+        "analystReview": "2026-01",
         "auditReview": "2025-12",
         "reconsideration": "2026-05"
       },
@@ -116,6 +116,102 @@
         "asOf": "2026-10-05",
         "queues": {
           "analystReview": "2025-12",
+          "auditReview": "2025-12",
+          "reconsideration": "2026-05"
+        },
+        "averages": {
+          "analystReview": {
+            "month": "2026-08",
+            "days": 336
+          },
+          "auditReview": {
+            "month": "2026-08",
+            "days": null
+          }
+        }
+      },
+      "pwd": {
+        "asOf": "2026-09-30",
+        "queues": {
+          "perm": {
+            "oews": "2026-06",
+            "nonOews": "2026-06"
+          },
+          "h1b": {
+            "oews": "2026-06",
+            "nonOews": "2026-06"
+          }
+        },
+        "redeterminations": {
+          "perm": "2026-07",
+          "h1b": "2026-08"
+        },
+        "directorReviews": {
+          "perm": "2026-07",
+          "h1b": "2026-07"
+        },
+        "remainingRequests": {
+          "perm": [
+            {
+              "month": "2026-04",
+              "count": 8
+            },
+            {
+              "month": "2026-05",
+              "count": 36
+            },
+            {
+              "month": "2026-06",
+              "count": 3532
+            },
+            {
+              "month": "2026-07",
+              "count": 15959
+            },
+            {
+              "month": "2026-08",
+              "count": 14980
+            },
+            {
+              "month": "2026-09",
+              "count": 14519
+            }
+          ],
+          "h1b": [
+            {
+              "month": "2026-04",
+              "count": 3
+            },
+            {
+              "month": "2026-05",
+              "count": 1
+            },
+            {
+              "month": "2026-06",
+              "count": 74
+            },
+            {
+              "month": "2026-07",
+              "count": 248
+            },
+            {
+              "month": "2026-08",
+              "count": 183
+            },
+            {
+              "month": "2026-09",
+              "count": 201
+            }
+          ]
+        }
+      }
+    },
+    {
+      "observedAt": "2026-10-27",
+      "perm": {
+        "asOf": "2026-10-05",
+        "queues": {
+          "analystReview": "2026-01",
           "auditReview": "2025-12",
           "reconsideration": "2026-05"
         },
